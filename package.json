@@ -1,0 +1,7 @@
+{
+    "devDependencies": {
+        "@rocket.chat/apps-engine": "file:///Users/marcelo/Sites/Rocket.Chat.Apps-engine",
+        "tslint": "^5.10.0",
+        "typescript": "^2.9.1"
+    }
+}
