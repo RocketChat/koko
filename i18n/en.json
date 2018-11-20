@@ -1,4 +1,8 @@
 {
-    "Koko_Room_Id": "Room Id",
-    "Koko_Room_Id_Description": "The room id for Koko to get members from"
+    "Koko_Command_Params": "",
+    "Koko_Command_Description": "",
+    "Koko_Members_Room_Id": "Members Room Id",
+    "Koko_Members_Room_Id_Description": "The room id for Koko to get members from",
+    "Koko_Post_Room_Id": "Post Room Id",
+    "Koko_Post_Room_Id_Description": "The room id for Koko to post praises to"
 }

@@ -1,3 +1,5 @@
 export interface IPraiseStorage {
-    listen: boolean;
+    listen: string;
+    username?: string;
+    praise?: string;
 }
