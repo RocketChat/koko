@@ -127,7 +127,7 @@ export class KokoPraise {
         try {
             room = await read.getRoomReader().getDirectByUsernames(usernames);
         } catch (error) {
-            await this.notifyError(context, modify, error);
+            console.log(error);
         }
 
         if (room) {
@@ -157,7 +157,7 @@ export class KokoPraise {
         try {
             members = await read.getRoomReader().getMembers(this.app.kokoMembersRoomId);
         } catch (error) {
-            await this.notifyError(context, modify, error);
+            console.log(error);
         }
         return members;
     }
@@ -173,20 +173,5 @@ export class KokoPraise {
             .setEmojiAvatar(this.app.kokoEmojiAvatar)
             .setUsernameAlias(this.app.kokoName);
         const msgId = await modify.getCreator().finish(message);
-    }
-
-    /**
-     * Notifies user who triggered the action of an error
-     * @param context
-     * @param modify
-     * @param error the thrown error
-     */
-    private async notifyError(context: SlashCommandContext, modify: IModify, error: Error) {
-        const builder = modify.getCreator().startMessage()
-            .setUsernameAlias(this.app.kokoName)
-            .setEmojiAvatar(this.app.kokoEmojiAvatar)
-            .setText(`An error occured: ${error.message}`);
-
-        modify.getNotifier().notifyUser(context.getSender(), builder.getMessage());
     }
 }
