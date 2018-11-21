@@ -1,4 +1,5 @@
-import { IAppAccessors, IConfigurationExtend, IConfigurationModify, IEnvironmentRead, IHttp, ILogger, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { IAppAccessors, IConfigurationExtend, IConfigurationModify, IEnvironmentRead, IHttp, ILogger, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
@@ -8,7 +9,8 @@ import { IUser } from '@rocket.chat/apps-engine/definition/users';
 
 import { KokoHelp } from './actions/KokoHelp';
 import { KokoPraise } from './actions/KokoPraise';
-import { KokoCommand } from './commands/KokoCommand';
+import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
+// import { KokoCommand } from './commands/KokoCommand';
 import { IPraiseStorage } from './storage/PraiseStorage';
 
 export class KokoApp extends App implements IPostMessageSent {
@@ -26,14 +28,10 @@ export class KokoApp extends App implements IPostMessageSent {
         this.kokoPraise = new KokoPraise(this);
     }
 
-    public async initialize(configurationExtend: IConfigurationExtend, environmentRead: IEnvironmentRead) {
-        super.initialize(configurationExtend, environmentRead);
-        this.botUser = await this.getAccessors().reader.getUserReader().getByUsername('rocket.cat');
-    }
-
     public async onEnable(environmentRead: IEnvironmentRead, configModify: IConfigurationModify): Promise<boolean> {
         this.kokoMembersRoomId = await environmentRead.getSettings().getValueById('Members_Room_Id');
         this.kokoPostRoomId = await environmentRead.getSettings().getValueById('Post_Room_Id');
+        this.botUser = await this.getAccessors().reader.getUserReader().getByUsername('rocket.cat');
         return true;
     }
 
@@ -53,20 +51,19 @@ export class KokoApp extends App implements IPostMessageSent {
         return message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== 'rocket.cat' && message.room.id.indexOf('rocket.cat') !== -1;
     }
 
-    public async executePostMessageSent(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence): Promise<void> {
+    public async executePostMessageSent(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
         const waitdata = await read.getPersistenceReader().readByAssociation(association);
-        console.log(waitdata);
         if (waitdata && waitdata.length > 0 && waitdata[0]) {
             const data = waitdata[0] as IPraiseStorage;
             if (data.listen === 'username' || data.listen === 'praise') {
-                await this.kokoPraise.listen(data, message, read, persistence);
+                await this.kokoPraise.listen(data, message, read, persistence, modify);
             }
         }
     }
 
     protected async extendConfiguration(configuration: IConfigurationExtend): Promise<void> {
-        await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
+        // await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
         await configuration.settings.provideSetting({
             id: 'Members_Room_Id',
             type: SettingType.STRING,
@@ -84,6 +81,13 @@ export class KokoApp extends App implements IPostMessageSent {
             public: false,
             i18nLabel: 'Koko_Post_Room_Id',
             i18nDescription: 'Koko_Post_Room_Id_Description',
+        });
+        await configuration.api.provideApi({
+            visibility: ApiVisibility.PRIVATE,
+            security: ApiSecurity.UNSECURE,
+            endpoints: [
+                new PraiseEndpoint(this),
+            ],
         });
     }
 }

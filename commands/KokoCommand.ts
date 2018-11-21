@@ -17,7 +17,7 @@ export class KokoCommand implements ISlashCommand {
         }
         switch (args[0]) {
             case 'praise':
-                return await this.app.kokoPraise.run(context, read, modify, http, persis);
+                return await this.app.kokoPraise.run(read, modify, http, persis);
             default:
                 return await this.app.kokoHelp.run(context, modify);
         }

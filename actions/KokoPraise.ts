@@ -11,8 +11,8 @@ import { IPraiseStorage } from '../storage/PraiseStorage';
 export class KokoPraise {
     constructor(private readonly app: KokoApp) { }
 
-    public async run(context: SlashCommandContext, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence) {
-        const members = await this.getMembers(context, read, modify);
+    public async run(read: IRead, modify: IModify, http: IHttp, persistence: IPersistence) {
+        const members = await this.getMembers(read);
 
         // build a list of usernames to add to message attachment
         const users = members
@@ -29,7 +29,7 @@ export class KokoPraise {
             });
 
         members.forEach(async (member) => {
-            const room = await this.getDirect(context, read, modify, member.username) as IRoom;
+            const room = await this.getDirect(read, modify, member.username) as IRoom;
             const builder = modify.getCreator().startMessage()
                 .setSender(this.app.botUser)
                 .setRoom(room)
@@ -46,14 +46,13 @@ export class KokoPraise {
             try {
                 await modify.getCreator().finish(builder);
             } catch (error) {
-                builder.setText('An error occured while sending praise request to members');
-                modify.getNotifier().notifyUser(context.getSender(), builder.getMessage());
+                console.log(error);
             }
         });
         return;
     }
 
-    public async listen(data: IPraiseStorage, message: IMessage, read: IRead, persistence: IPersistence) {
+    public async listen(data: IPraiseStorage, message: IMessage, read: IRead, persistence: IPersistence, modify: IModify) {
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
         if (data.listen === 'username') {
             const username = await this.getUsernameFromMessage(message, read);
@@ -83,7 +82,7 @@ export class KokoPraise {
                     .setSender(this.app.botUser)
                     .getMessage();
                 await read.getNotifier().notifyUser(message.sender, msg);
-                await this.sendPraise(data.username as string, message.text as string, message.sender);
+                await this.sendPraise(data.username as string, message.text as string, message.sender, read, modify);
             }
         }
     }
@@ -121,7 +120,7 @@ export class KokoPraise {
      * @returns the room
      */
     // tslint:disable-next-line:max-line-length
-    private async getDirect(context: SlashCommandContext, read: IRead, modify: IModify, username: string): Promise<IRoom | undefined> {
+    private async getDirect(read: IRead, modify: IModify, username: string): Promise<IRoom | undefined> {
         const usernames = ['rocket.cat', username];
         let room;
         try {
@@ -152,7 +151,7 @@ export class KokoPraise {
      * @param persis
      * @returns array of users
      */
-    private async getMembers(context: SlashCommandContext, read: IRead, modify: IModify): Promise<Array<IUser>> {
+    private async getMembers(read: IRead): Promise<Array<IUser>> {
         let members;
         try {
             members = await read.getRoomReader().getMembers(this.app.kokoMembersRoomId);
@@ -162,10 +161,8 @@ export class KokoPraise {
         return members;
     }
 
-    private async sendPraise(username: string, text: string, sender: IUser) {
-        const reader = this.app.getAccessors().reader;
-        const postRoom = await reader.getRoomReader().getById(this.app.kokoPostRoomId) as IRoom;
-        const modify = this.app.getAccessors().modifier;
+    private async sendPraise(username: string, text: string, sender: IUser, read: IRead, modify: IModify) {
+        const postRoom = await read.getRoomReader().getById(this.app.kokoPostRoomId) as IRoom;
         const message = modify.getCreator().startMessage()
             .setText(`@${sender.username} says thanks to @${username} for ${text}`)
             .setRoom(postRoom)
