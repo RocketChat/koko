@@ -3,11 +3,14 @@ import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
-import { RoomType } from '@rocket.chat/apps-engine/definition/rooms';
+import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
 import { ISetting, SettingType } from '@rocket.chat/apps-engine/definition/settings';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
+import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
+import { IMembersCache } from './IMemberCache';
 import { IPraiseStorage } from './storage/IPraiseStorage';
 
 export class KokoApp extends App implements IPostMessageSent {
@@ -41,9 +44,20 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     public readonly kokoPraise: KokoPraise;
 
+    /**
+     * The random one on one mechanism
+     */
+    public readonly kokoOneOnOne: KokoOneOnOne;
+
+    /**
+     * Members cache
+     */
+    private membersCache: IMembersCache;
+
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
         this.kokoPraise = new KokoPraise(this);
+        this.kokoOneOnOne = new KokoOneOnOne(this);
     }
 
     /**
@@ -103,9 +117,71 @@ export class KokoApp extends App implements IPostMessageSent {
         const waitdata = await read.getPersistenceReader().readByAssociation(association);
         if (waitdata && waitdata.length > 0 && waitdata[0]) {
             const data = waitdata[0] as IPraiseStorage;
-            if (data.listen === 'username' || data.listen === 'praise') {
-                await this.kokoPraise.listen(data, message, read, persistence, modify);
+            switch (data.listen) {
+                case 'username':
+                case 'praise':
+                    await this.kokoPraise.listen(data, message, read, persistence, modify);
+                    break;
+                case 'one-on-one':
+                    await this.kokoOneOnOne.listen(data, message, read, persistence, modify);
+                    break;
             }
+        }
+    }
+
+    /**
+     * Gets users of room defined by room id setting
+     * Uses simple caching (30s) for avoiding repeated database queries
+     *
+     * @param context
+     * @param read
+     * @param modify
+     * @param http
+     * @param persis
+     * @returns array of users
+     */
+    public async getMembers(read: IRead): Promise<Array<IUser>> {
+        if (this.membersCache && this.membersCache.expire > Date.now()) {
+            return this.membersCache.members;
+        }
+        let members;
+        try {
+            members = await read.getRoomReader().getMembers(this.kokoMembersRoomId);
+        } catch (error) {
+            console.log(error);
+        }
+        this.membersCache = { members, expire: Date.now() + 30000 };
+        return members;
+    }
+
+    /**
+     * Gets a direct message room between rocket.cat and another user, creating if it doesn't exist
+     *
+     * @param context
+     * @param read
+     * @param modify
+     * @param username
+     * @returns the room
+     */
+    public async getDirect(read: IRead, modify: IModify, username: string): Promise <IRoom | undefined > {
+        const usernames = ['rocket.cat', username];
+        let room;
+        try {
+            room = await read.getRoomReader().getDirectByUsernames(usernames);
+        } catch (error) {
+            console.log(error);
+        }
+
+        if (room) {
+            return room;
+        } else {
+            let roomId;
+            const newRoom = modify.getCreator().startRoom()
+                .setType(RoomType.DIRECT_MESSAGE)
+                .setCreator(this.botUser)
+                .setUsernames(usernames);
+            roomId = await modify.getCreator().finish(newRoom);
+            return await read.getRoomReader().getById(roomId);
         }
     }
 
@@ -140,6 +216,7 @@ export class KokoApp extends App implements IPostMessageSent {
             security: ApiSecurity.UNSECURE,
             endpoints: [
                 new PraiseEndpoint(this),
+                new OneOnOneEndpoint(this),
             ],
         });
     }

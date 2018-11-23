@@ -23,7 +23,7 @@ export class KokoPraise {
      */
     public async run(read: IRead, modify: IModify, http: IHttp, persistence: IPersistence) {
         // Gets room members
-        const members = await this.getMembers(read);
+        const members = await this.app.getMembers(read);
 
         // Build a list of usernames to add to message attachment
         const users = members
@@ -50,11 +50,11 @@ export class KokoPraise {
         // Sends a random message to each member
         members.forEach(async (member) => {
             // Gets or creates a direct message room between botUser and member
-            const room = await this.getDirect(read, modify, member.username) as IRoom;
+            const room = await this.app.getDirect(read, modify, member.username) as IRoom;
 
             // Saves new association record for listening for the username
             const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-            persistence.updateByAssociation(assoc, { listen: 'username' }, true);
+            await persistence.updateByAssociation(assoc, { listen: 'username' }, true);
 
             const builder = modify.getCreator().startMessage()
                 .setSender(this.app.botUser)
@@ -132,11 +132,11 @@ export class KokoPraise {
                     } else {
                         scoreStorage = { score: 1 } as IScoreStorage;
                     }
-                    persistence.updateByAssociation(scoreAssociation, scoreStorage, true);
+                    await persistence.updateByAssociation(scoreAssociation, scoreStorage, true);
                 }
 
                 // Removes listening record from persistence storage
-                persistence.removeByAssociation(association);
+                await persistence.removeByAssociation(association);
 
                 // Sends the praise
                 await this.sendPraise(data.username as string, message.text as string, message.sender, read, modify);
@@ -164,7 +164,7 @@ export class KokoPraise {
      */
     private async selectUsername(username: string, association: RocketChatAssociationRecord, message: IMessage, read: IRead, persistence: IPersistence) {
         // Updates persistence storage with listening for a praise and selected username
-        persistence.updateByAssociation(association, { listen: 'praise', username }, true);
+        await persistence.updateByAssociation(association, { listen: 'praise', username }, true);
 
         // Checks if it's a self praise
         let txt;
@@ -197,7 +197,7 @@ export class KokoPraise {
 
         if (username) {
             // Loads members for checking
-            const members = await this.getMembers(read);
+            const members = await this.app.getMembers(read);
             // Returns as soon as one is found
             if (Array.from(members).some((member: IUser) => {
                 return member.username === username;
@@ -206,61 +206,6 @@ export class KokoPraise {
             }
         }
         return false;
-    }
-    /**
-     * Gets a direct message room between rocket.cat and another user, creating if it doesn't exist
-     *
-     * @param context
-     * @param read
-     * @param modify
-     * @param username
-     * @returns the room
-     */
-    private async getDirect(read: IRead, modify: IModify, username: string): Promise<IRoom | undefined> {
-        const usernames = ['rocket.cat', username];
-        let room;
-        try {
-            room = await read.getRoomReader().getDirectByUsernames(usernames);
-        } catch (error) {
-            console.log(error);
-        }
-
-        if (room) {
-            return room;
-        } else {
-            let roomId;
-            const newRoom = modify.getCreator().startRoom()
-                .setType(RoomType.DIRECT_MESSAGE)
-                .setCreator(this.app.botUser)
-                .setUsernames(usernames);
-            roomId = await modify.getCreator().finish(newRoom);
-            return await read.getRoomReader().getById(roomId);
-        }
-    }
-
-    /**
-     * Gets users of room defined by room id setting
-     * Uses simple caching (30s) for avoiding repeated database queries
-     *
-     * @param context
-     * @param read
-     * @param modify
-     * @param http
-     * @param persis
-     * @returns array of users
-     */
-    private async getMembers(read: IRead): Promise<Array<IUser>> {
-        if (this.membersCache && this.membersCache.expire > new Date()) {
-            return this.membersCache.members;
-        }
-        let members;
-        try {
-            members = await read.getRoomReader().getMembers(this.app.kokoMembersRoomId);
-        } catch (error) {
-            console.log(error);
-        }
-        this.membersCache = { members, expire: Date.now() + 30000};
-        return members;
     }
 
     /**
