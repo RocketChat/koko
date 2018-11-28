@@ -19,7 +19,8 @@ export class KokoOneOnOne {
     public async run(read: IRead, modify: IModify, http: IHttp, persistence: IPersistence) {
         // When running a new one-on-one request, clear pending one-on-one
         const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
-        await persistence.updateByAssociation(oneOnOneAssociation, { count: 0 }, true);
+        await persistence.removeByAssociation(oneOnOneAssociation);
+        // await persistence.updateByAssociation(oneOnOneAssociation, { count: 0 }, true);
 
         const members = await this.app.getMembers(read);
 
@@ -78,26 +79,14 @@ export class KokoOneOnOne {
             if (message.text === 'Yes') {
                 const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
 
-                // Atomic update association to indicate last user that answered yes and in what position
-                const oneOnOne = await persistence.findAndUpdateByAssociation(oneOnOneAssociation, {
-                    $set: { 'data.username': message.sender.username },
-                    $inc: { 'data.count': 1 },
-                }, false, true);
+                // Atomic update association to indicate last user that answered yes
+                const oneOnOne = await persistence.updateByAssociation(oneOnOneAssociation, {
+                    username: message.sender.username,
+                }, true, true, false) as any;
 
-                // The atomic update above returns the record before being updated, so the logic is as below:
-                // Odd positions are the matching users
-                // Even positions are the first caller, waiting for someone
-                const oddOrEven = (oneOnOne && oneOnOne.value && oneOnOne.value.data.count) || 0;
-                if (oddOrEven % 2 === 0) {
-                    const msg = read.getNotifier().getMessageBuilder()
-                        .setText(`Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`)
-                        .setUsernameAlias(this.app.kokoName)
-                        .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                        .setRoom(message.room)
-                        .setSender(this.app.botUser)
-                        .getMessage();
-                    await read.getNotifier().notifyUser(message.sender, msg);
-                } else {
+                if (oneOnOne && oneOnOne.data) {
+                    // Previous user found
+                    await persistence.removeByAssociation(oneOnOneAssociation);
                     // tslint:disable-next-line:max-line-length
                     const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
                     const msg = read.getNotifier().getMessageBuilder()
@@ -109,16 +98,28 @@ export class KokoOneOnOne {
                         .getMessage();
                     await read.getNotifier().notifyUser(message.sender, msg);
 
-                    const user = await read.getUserReader().getByUsername(oneOnOne.value.data.username);
-                    const room = await this.app.getDirect(read, modify, oneOnOne.value.data.username) as IRoom;
-                    const msg2 = read.getNotifier().getMessageBuilder()
+                    const room = await this.app.getDirect(read, modify, oneOnOne.data.username) as IRoom;
+                    const builder = modify.getCreator().startMessage()
+                        .setSender(this.app.botUser)
+                        .setRoom(room)
                         .setText(`I found a match for you. Please click [here](${url}) to join your random one-on-one.`)
                         .setUsernameAlias(this.app.kokoName)
+                        .setEmojiAvatar(this.app.kokoEmojiAvatar);
+                    try {
+                        await modify.getCreator().finish(builder);
+                    } catch (error) {
+                        console.log(error);
+                    }
+                } else {
+                    // No one was found waiting, so we wait
+                    const msg = read.getNotifier().getMessageBuilder()
+                        .setText(`Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`)
+                        .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                        .setRoom(room)
+                        .setRoom(message.room)
                         .setSender(this.app.botUser)
                         .getMessage();
-                    await read.getNotifier().notifyUser(user, msg2);
+                    await read.getNotifier().notifyUser(message.sender, msg);
                 }
             } else {
                 const msg = read.getNotifier().getMessageBuilder()
