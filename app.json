@@ -1,12 +1,12 @@
 {
     "id": "b9970f61-06ac-46e4-ade3-3b0f0c667739",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "requiredApiVersion": "^1.0.0",
     "iconFile": "icon.png",
     "author": {
         "name": "Marcelo Schmidt",
-        "homepage": "https://rocket.chat",
-        "support": "https://rocket.chat"
+        "homepage": "https://github.com/marceloschmidt/koko",
+        "support": "https://github.com/marceloschmidt/koko/issues"
     },
     "name": "Koko",
     "nameSlug": "koko",
