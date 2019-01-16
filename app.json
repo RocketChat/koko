@@ -1,6 +1,6 @@
 {
     "id": "b9970f61-06ac-46e4-ade3-3b0f0c667739",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "requiredApiVersion": "^1.0.0",
     "iconFile": "icon.png",
     "author": {
@@ -11,5 +11,5 @@
     "name": "Koko",
     "nameSlug": "koko",
     "classFile": "KokoApp.ts",
-    "description": "Rocket.Chat People Bot"
+    "description": "Rocket.Chat Koko Bot"
 }

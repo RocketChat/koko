@@ -30,6 +30,7 @@ export class KokoPraise {
             .sort((a, b) => {
                 return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
             })
+            .filter((member) => member.username !== 'rocket.cat' )
             .map((member) => {
                 return {
                     text: member.name,

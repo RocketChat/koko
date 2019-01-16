@@ -80,13 +80,16 @@ export class KokoOneOnOne {
                 const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
 
                 // Atomic update association to indicate last user that answered yes
-                const oneOnOne = await persistence.updateByAssociation(oneOnOneAssociation, {
-                    username: message.sender.username,
-                }, true, true, false) as any;
-
-                if (oneOnOne && oneOnOne.data) {
-                    // Previous user found
+                // const oneOnOne = await persistence.updateByAssociation(oneOnOneAssociation, {
+                //     username: message.sender.username,
+                // }, true, true, false) as any;
+                const oneOnOneData = await read.getPersistenceReader().readByAssociation(oneOnOneAssociation);
+                if (oneOnOneData && oneOnOneData.length > 0 && oneOnOneData[0]) {
+                    const oneOnOne = oneOnOneData[0] as any;
+                    // Previous user found; Remove association to avoid possible race condition sooner
+                    const username = oneOnOne.username;
                     await persistence.removeByAssociation(oneOnOneAssociation);
+
                     // tslint:disable-next-line:max-line-length
                     const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
                     const msg = read.getNotifier().getMessageBuilder()
@@ -98,7 +101,7 @@ export class KokoOneOnOne {
                         .getMessage();
                     await read.getNotifier().notifyUser(message.sender, msg);
 
-                    const room = await this.app.getDirect(read, modify, oneOnOne.data.username) as IRoom;
+                    const room = await this.app.getDirect(read, modify, username) as IRoom;
                     const builder = modify.getCreator().startMessage()
                         .setSender(this.app.botUser)
                         .setRoom(room)
@@ -111,6 +114,10 @@ export class KokoOneOnOne {
                         console.log(error);
                     }
                 } else {
+                    await persistence.updateByAssociation(oneOnOneAssociation, {
+                        username: message.sender.username,
+                    }, true);
+
                     // No one was found waiting, so we wait
                     const msg = read.getNotifier().getMessageBuilder()
                         .setText(`Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`)
@@ -119,6 +126,7 @@ export class KokoOneOnOne {
                         .setRoom(message.room)
                         .setSender(this.app.botUser)
                         .getMessage();
+
                     await read.getNotifier().notifyUser(message.sender, msg);
                 }
             } else {
