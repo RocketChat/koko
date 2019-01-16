@@ -1,6 +1,7 @@
 import { IAppAccessors, IConfigurationExtend, IConfigurationModify, IEnvironmentRead, IHttp, ILogger, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
+import { AppStatus } from '@rocket.chat/apps-engine/definition/AppStatus';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
@@ -25,14 +26,29 @@ export class KokoApp extends App implements IPostMessageSent {
     public kokoEmojiAvatar: string = ':gorilla:';
 
     /**
-     * The room id where to get members from
+     * The room name where to get members from
      */
-    public kokoMembersRoomId: string;
+    public kokoMembersRoomName: string;
 
     /**
-     * The room id where to post thanks messages to
+     * The actual room object where to get members from
      */
-    public kokoPostRoomId: string;
+    public kokoMembersRoom: IRoom;
+
+    /**
+     * The room name where to post thanks messages to
+     */
+    public kokoPostRoomName: string;
+
+    /**
+     * The actual room object where to post thanks messages to
+     */
+    public kokoPostRoom: IRoom;
+
+    /**
+     * The bot username who sends the messages
+     */
+    public botUsername: string = 'rocket.cat';
 
     /**
      * The bot user sending messages
@@ -61,17 +77,32 @@ export class KokoApp extends App implements IPostMessageSent {
     }
 
     /**
-     * Loads the room id where to get members from
-     * Loads the room id where to post messages to
+     * Loads the room where to get members from
+     * Loads the room where to post messages to
      * Loads the user who'll be posting messages as the botUser
      *
      * @param environmentRead
      * @param configModify
      */
     public async onEnable(environmentRead: IEnvironmentRead, configModify: IConfigurationModify): Promise<boolean> {
-        this.kokoMembersRoomId = await environmentRead.getSettings().getValueById('Members_Room_Id');
-        this.kokoPostRoomId = await environmentRead.getSettings().getValueById('Post_Room_Id');
-        this.botUser = await this.getAccessors().reader.getUserReader().getByUsername('rocket.cat');
+        this.kokoMembersRoomName = await environmentRead.getSettings().getValueById('Members_Room_Name');
+        if (this.kokoMembersRoomName) {
+            this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
+        } else {
+            return false;
+        }
+        this.kokoPostRoomName = await environmentRead.getSettings().getValueById('Post_Room_Name');
+        if (this.kokoPostRoomName) {
+            this.kokoPostRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostRoomName) as IRoom;
+        } else {
+            return false;
+        }
+        this.botUsername = await environmentRead.getSettings().getValueById('Bot_Username');
+        if (this.botUsername) {
+            this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
+        } else {
+            return false;
+        }
         return true;
     }
 
@@ -85,22 +116,37 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     public async onSettingUpdated(setting: ISetting, configModify: IConfigurationModify, read: IRead, http: IHttp): Promise<void> {
         switch (setting.id) {
-            case 'Members_Room_Id':
-                this.kokoMembersRoomId = setting.value;
+            case 'Members_Room_Name':
+                this.kokoMembersRoomName = setting.value;
+                if (this.kokoMembersRoomName) {
+                    this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
+                }
                 break;
-            case 'Post_Room_Id':
-                this.kokoPostRoomId = setting.value;
+            case 'Post_Room_Name':
+                this.kokoPostRoomName = setting.value;
+                if (this.kokoPostRoomName) {
+                    this.kokoPostRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostRoomName) as IRoom;
+                }
+                break;
+            case 'Bot_User':
+                this.botUsername = setting.value;
+                if (this.botUsername) {
+                    this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
+                }
                 break;
         }
     }
 
     /**
-     * We'll ignore any message that is not a direct message between rocket.cat and user
+     * We'll ignore any message that is not a direct message between bot and user
      *
      * @param message
      */
     public async checkPostMessageSent(message: IMessage): Promise<boolean> {
-        return message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== 'rocket.cat' && message.room.id.indexOf('rocket.cat') !== -1;
+        // tslint:disable-next-line:max-line-length
+        console.log(this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUsername && message.room.id.indexOf(this.botUser.id) !== -1);
+        // tslint:disable-next-line:max-line-length
+        return this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUsername && message.room.id.indexOf(this.botUser.id) !== -1;
     }
 
     /**
@@ -145,17 +191,19 @@ export class KokoApp extends App implements IPostMessageSent {
             return this.membersCache.members;
         }
         let members;
-        try {
-            members = await read.getRoomReader().getMembers(this.kokoMembersRoomId);
-        } catch (error) {
-            console.log(error);
+        if (this.kokoMembersRoom) {
+            try {
+                members = await read.getRoomReader().getMembers(this.kokoMembersRoom.id);
+            } catch (error) {
+                console.log(error);
+            }
+            this.membersCache = { members, expire: Date.now() + 30000 };
         }
-        this.membersCache = { members, expire: Date.now() + 30000 };
         return members;
     }
 
     /**
-     * Gets a direct message room between rocket.cat and another user, creating if it doesn't exist
+     * Gets a direct message room between bot and another user, creating if it doesn't exist
      *
      * @param context
      * @param read
@@ -164,7 +212,7 @@ export class KokoApp extends App implements IPostMessageSent {
      * @returns the room
      */
     public async getDirect(read: IRead, modify: IModify, username: string): Promise <IRoom | undefined > {
-        const usernames = ['rocket.cat', username];
+        const usernames = [this.botUsername, username];
         let room;
         try {
             room = await read.getRoomReader().getDirectByUsernames(usernames);
@@ -174,7 +222,7 @@ export class KokoApp extends App implements IPostMessageSent {
 
         if (room) {
             return room;
-        } else {
+        } else if (this.botUser) {
             let roomId;
             const newRoom = modify.getCreator().startRoom()
                 .setType(RoomType.DIRECT_MESSAGE)
@@ -182,6 +230,8 @@ export class KokoApp extends App implements IPostMessageSent {
                 .setUsernames(usernames);
             roomId = await modify.getCreator().finish(newRoom);
             return await read.getRoomReader().getById(roomId);
+        } else {
+            return;
         }
     }
 
@@ -194,22 +244,31 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     protected async extendConfiguration(configuration: IConfigurationExtend): Promise<void> {
         await configuration.settings.provideSetting({
-            id: 'Members_Room_Id',
+            id: 'Members_Room_Name',
             type: SettingType.STRING,
             packageValue: '',
             required: true,
             public: false,
-            i18nLabel: 'Koko_Members_Room_Id',
-            i18nDescription: 'Koko_Members_Room_Id_Description',
+            i18nLabel: 'Koko_Members_Room_Name',
+            i18nDescription: 'Koko_Members_Room_Name_Description',
         });
         await configuration.settings.provideSetting({
-            id: 'Post_Room_Id',
+            id: 'Post_Room_Name',
             type: SettingType.STRING,
             packageValue: '',
             required: true,
             public: false,
-            i18nLabel: 'Koko_Post_Room_Id',
-            i18nDescription: 'Koko_Post_Room_Id_Description',
+            i18nLabel: 'Koko_Post_Room_Name',
+            i18nDescription: 'Koko_Post_Room_Name_Description',
+        });
+        await configuration.settings.provideSetting({
+            id: 'Bot_Username',
+            type: SettingType.STRING,
+            packageValue: 'rocket.cat',
+            required: true,
+            public: false,
+            i18nLabel: 'Koko_Bot_Username',
+            i18nDescription: 'Koko_Bot_Username_Description',
         });
         await configuration.api.provideApi({
             visibility: ApiVisibility.PRIVATE,

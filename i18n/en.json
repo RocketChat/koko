@@ -1,6 +1,8 @@
 {
-    "Koko_Members_Room_Id": "Members Room Id",
-    "Koko_Members_Room_Id_Description": "The room id for Koko to get members from",
-    "Koko_Post_Room_Id": "Post Room Id",
-    "Koko_Post_Room_Id_Description": "The room id for Koko to post praises to"
+    "Koko_Bot_Username": "Bot Username",
+    "Koko_Bot_Username_Description": "The username who'll send the messages",
+    "Koko_Members_Room_Name": "Members Room Name",
+    "Koko_Members_Room_Name_Description": "The room name for Koko to get members from",
+    "Koko_Post_Room_Name": "Post Room Name",
+    "Koko_Post_Room_Name_Description": "The room name for Koko to post praises to"
 }

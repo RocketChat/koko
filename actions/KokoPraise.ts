@@ -25,54 +25,56 @@ export class KokoPraise {
         // Gets room members
         const members = await this.app.getMembers(read);
 
-        // Build a list of usernames to add to message attachment
-        const users = members
-            .sort((a, b) => {
-                return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
-            })
-            .filter((member) => member.username !== 'rocket.cat' )
-            .map((member) => {
-                return {
-                    text: member.name,
-                    type: MessageActionType.BUTTON,
-                    msg_in_chat_window: true,
-                    msg: `@${member.username}`,
-                };
-            });
-
-        // Randomize praise request message
-        const praiseQuestions = [
-            'Hello :vulcan: would you like to praise someone today?',
-            'I\'m sure someone did something good recently. Who deserves your thanks?',
-            ':rc: praise time :tada: Who deserves your :clapping: this week?',
-            'How about giving praise to someone today?',
-        ];
-
-        // Sends a random message to each member
-        members.forEach(async (member) => {
-            // Gets or creates a direct message room between botUser and member
-            const room = await this.app.getDirect(read, modify, member.username) as IRoom;
-
-            // Saves new association record for listening for the username
-            const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-            await persistence.updateByAssociation(assoc, { listen: 'username' }, true);
-
-            const builder = modify.getCreator().startMessage()
-                .setSender(this.app.botUser)
-                .setRoom(room)
-                .setText(praiseQuestions[random(0, praiseQuestions.length - 1)])
-                .setUsernameAlias(this.app.kokoName)
-                .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                .addAttachment({
-                    actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
-                    actions: users,
+        if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostRoom !== undefined) {
+            // Build a list of usernames to add to message attachment
+            const users = members
+                .sort((a, b) => {
+                    return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
+                })
+                .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername)
+                .map((member) => {
+                    return {
+                        text: member.name,
+                        type: MessageActionType.BUTTON,
+                        msg_in_chat_window: true,
+                        msg: `@${member.username}`,
+                    };
                 });
-            try {
-                await modify.getCreator().finish(builder);
-            } catch (error) {
-                console.log(error);
-            }
-        });
+
+            // Randomize praise request message
+            const praiseQuestions = [
+                'Hello :vulcan: would you like to praise someone today?',
+                'I\'m sure someone did something good recently. Who deserves your thanks?',
+                ':rc: praise time :tada: Who deserves your :clapping: this week?',
+                'How about giving praise to someone today?',
+            ];
+
+            // Sends a random message to each member
+            members.forEach(async (member) => {
+                // Gets or creates a direct message room between botUser and member
+                const room = await this.app.getDirect(read, modify, member.username) as IRoom;
+
+                // Saves new association record for listening for the username
+                const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
+                await persistence.updateByAssociation(assoc, { listen: 'username' }, true);
+
+                const builder = modify.getCreator().startMessage()
+                    .setSender(this.app.botUser)
+                    .setRoom(room)
+                    .setText(praiseQuestions[random(0, praiseQuestions.length - 1)])
+                    .setUsernameAlias(this.app.kokoName)
+                    .setEmojiAvatar(this.app.kokoEmojiAvatar)
+                    .addAttachment({
+                        actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
+                        actions: users,
+                    });
+                try {
+                    await modify.getCreator().finish(builder);
+                } catch (error) {
+                    console.log(error);
+                }
+            });
+        }
         return;
     }
 
@@ -210,7 +212,7 @@ export class KokoPraise {
     }
 
     /**
-     * Sends a praise message to the room specified by kokoPostRoomId
+     * Sends a praise message to kokoPostRoom
      *
      * @param username the username being praised
      * @param text the motive for praising
@@ -231,10 +233,9 @@ export class KokoPraise {
             msg = praiseMessages[random(0, praiseMessages.length - 1)];
             msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + username).replace('{text}', text);
         }
-        const postRoom = await read.getRoomReader().getById(this.app.kokoPostRoomId) as IRoom;
         const message = modify.getCreator().startMessage()
             .setText(msg)
-            .setRoom(postRoom)
+            .setRoom(this.app.kokoPostRoom)
             .setSender(this.app.botUser)
             .setEmojiAvatar(this.app.kokoEmojiAvatar)
             .setUsernameAlias(this.app.kokoName);
