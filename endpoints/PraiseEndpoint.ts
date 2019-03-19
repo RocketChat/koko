@@ -11,7 +11,7 @@ export class PraiseEndpoint extends ApiEndpoint {
 
     // tslint:disable-next-line:max-line-length
     public async get(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        await this.app.kokoPraise.run(read, modify, http, persistence);
+        this.app.kokoPraise.run(read, modify, http, persistence);
         return this.success();
     }
 }

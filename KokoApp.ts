@@ -48,7 +48,7 @@ export class KokoApp extends App implements IPostMessageSent {
     /**
      * The bot username who sends the messages
      */
-    public botUsername: string = 'rocket.cat';
+    public botUsername: string;
 
     /**
      * The bot user sending messages
@@ -69,6 +69,12 @@ export class KokoApp extends App implements IPostMessageSent {
      * Members cache
      */
     private membersCache: IMembersCache;
+
+    /**
+     * Members cache expire time
+     * 300s
+     */
+    private MEMBERS_CACHE_EXPIRE: number = 300000;
 
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
@@ -144,9 +150,7 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     public async checkPostMessageSent(message: IMessage): Promise<boolean> {
         // tslint:disable-next-line:max-line-length
-        console.log(this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUsername && message.room.id.indexOf(this.botUser.id) !== -1);
-        // tslint:disable-next-line:max-line-length
-        return this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUsername && message.room.id.indexOf(this.botUser.id) !== -1;
+        return this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUser.id && message.room.id.indexOf(this.botUser.id) !== -1;
     }
 
     /**
@@ -177,7 +181,7 @@ export class KokoApp extends App implements IPostMessageSent {
 
     /**
      * Gets users of room defined by room id setting
-     * Uses simple caching (30s) for avoiding repeated database queries
+     * Uses simple caching for avoiding repeated database queries
      *
      * @param context
      * @param read
@@ -197,7 +201,7 @@ export class KokoApp extends App implements IPostMessageSent {
             } catch (error) {
                 console.log(error);
             }
-            this.membersCache = { members, expire: Date.now() + 30000 };
+            this.membersCache = { members, expire: Date.now() + this.MEMBERS_CACHE_EXPIRE };
         }
         return members;
     }
@@ -275,7 +279,7 @@ export class KokoApp extends App implements IPostMessageSent {
             security: ApiSecurity.UNSECURE,
             endpoints: [
                 new PraiseEndpoint(this),
-                new OneOnOneEndpoint(this),
+                // new OneOnOneEndpoint(this),
             ],
         });
     }

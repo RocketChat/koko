@@ -9,8 +9,6 @@ import { IScoreStorage } from '../storage/IScoreStorage';
 import { random } from '../utils';
 
 export class KokoPraise {
-    private membersCache;
-
     constructor(private readonly app: KokoApp) { }
 
     /**
@@ -23,7 +21,8 @@ export class KokoPraise {
      */
     public async run(read: IRead, modify: IModify, http: IHttp, persistence: IPersistence) {
         // Gets room members
-        const members = await this.app.getMembers(read);
+        const members = (await this.app.getMembers(read))
+            .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
         if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostRoom !== undefined) {
             // Build a list of usernames to add to message attachment
@@ -31,7 +30,6 @@ export class KokoPraise {
                 .sort((a, b) => {
                     return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
                 })
-                .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername)
                 .map((member) => {
                     return {
                         text: member.name,
@@ -50,7 +48,8 @@ export class KokoPraise {
             ];
 
             // Sends a random message to each member
-            members.forEach(async (member) => {
+            // members.forEach(async (member) => {
+            for (const member of members) {
                 // Gets or creates a direct message room between botUser and member
                 const room = await this.app.getDirect(read, modify, member.username) as IRoom;
 
@@ -73,7 +72,7 @@ export class KokoPraise {
                 } catch (error) {
                     console.log(error);
                 }
-            });
+            }
         }
         return;
     }
@@ -124,19 +123,19 @@ export class KokoPraise {
                  * If praising one-self, no score is added
                  * If praising someone else, this person gets 1 score point
                  */
-                if (data.username !== message.sender.username) {
-                    const scoreAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `score:${data.username}`);
-                    let scoreStorage: IScoreStorage;
-                    const scoreWait = await read.getPersistenceReader().readByAssociation(scoreAssociation);
-                    if (scoreWait && scoreWait.length > 0 && scoreWait[0]) {
-                        scoreStorage = scoreWait[0] as IScoreStorage;
-                        const score = scoreStorage.score || 0;
-                        scoreStorage = { score: score + 1 };
-                    } else {
-                        scoreStorage = { score: 1 } as IScoreStorage;
-                    }
-                    await persistence.updateByAssociation(scoreAssociation, scoreStorage, true);
-                }
+                // if (data.username !== message.sender.username) {
+                //     const scoreAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `score:${data.username}`);
+                //     let scoreStorage: IScoreStorage;
+                //     const scoreWait = await read.getPersistenceReader().readByAssociation(scoreAssociation);
+                //     if (scoreWait && scoreWait.length > 0 && scoreWait[0]) {
+                //         scoreStorage = scoreWait[0] as IScoreStorage;
+                //         const score = scoreStorage.score || 0;
+                //         scoreStorage = { score: score + 1 };
+                //     } else {
+                //         scoreStorage = { score: 1 } as IScoreStorage;
+                //     }
+                //     await persistence.updateByAssociation(scoreAssociation, scoreStorage, true);
+                // }
 
                 // Removes listening record from persistence storage
                 await persistence.removeByAssociation(association);
