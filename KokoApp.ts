@@ -1,7 +1,6 @@
 import { IAppAccessors, IConfigurationExtend, IConfigurationModify, IEnvironmentRead, IHttp, ILogger, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
-import { AppStatus } from '@rocket.chat/apps-engine/definition/AppStatus';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
@@ -9,7 +8,7 @@ import { ISetting, SettingType } from '@rocket.chat/apps-engine/definition/setti
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
-import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
+import { KokoCommand } from './commands/KokoCommand';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { IMembersCache } from './IMemberCache';
 import { IPraiseStorage } from './storage/IPraiseStorage';
@@ -167,13 +166,13 @@ export class KokoApp extends App implements IPostMessageSent {
         const waitdata = await read.getPersistenceReader().readByAssociation(association);
         if (waitdata && waitdata.length > 0 && waitdata[0]) {
             const data = waitdata[0] as IPraiseStorage;
+            const text = message.text as string;
+            const room = message.room;
+            const sender = message.sender;
             switch (data.listen) {
                 case 'username':
                 case 'praise':
-                    await this.kokoPraise.listen(data, message, read, persistence, modify);
-                    break;
-                case 'one-on-one':
-                    await this.kokoOneOnOne.listen(data, message, read, persistence, modify);
+                    await this.kokoPraise.answer({ data, text, room, sender, read, persistence, modify });
                     break;
             }
         }
@@ -190,7 +189,7 @@ export class KokoApp extends App implements IPostMessageSent {
      * @param persis
      * @returns array of users
      */
-    public async getMembers(read: IRead): Promise<Array<IUser>> {
+    public async getMembers({ read }: { read: IRead }): Promise<Array<IUser>> {
         if (this.membersCache && this.membersCache.expire > Date.now()) {
             return this.membersCache.members;
         }
@@ -203,7 +202,7 @@ export class KokoApp extends App implements IPostMessageSent {
             }
             this.membersCache = { members, expire: Date.now() + this.MEMBERS_CACHE_EXPIRE };
         }
-        return members;
+        return members || [];
     }
 
     /**
@@ -215,7 +214,7 @@ export class KokoApp extends App implements IPostMessageSent {
      * @param username
      * @returns the room
      */
-    public async getDirect(read: IRead, modify: IModify, username: string): Promise <IRoom | undefined > {
+    public async getDirect({ read, modify, username }: { read: IRead, modify: IModify, username: string }): Promise <IRoom | undefined > {
         const usernames = [this.botUsername, username];
         let room;
         try {
@@ -247,6 +246,7 @@ export class KokoApp extends App implements IPostMessageSent {
      * @param configuration
      */
     protected async extendConfiguration(configuration: IConfigurationExtend): Promise<void> {
+        // Settings
         await configuration.settings.provideSetting({
             id: 'Members_Room_Name',
             type: SettingType.STRING,
@@ -274,13 +274,17 @@ export class KokoApp extends App implements IPostMessageSent {
             i18nLabel: 'Koko_Bot_Username',
             i18nDescription: 'Koko_Bot_Username_Description',
         });
+
+        // API endpoints
         await configuration.api.provideApi({
             visibility: ApiVisibility.PRIVATE,
             security: ApiSecurity.UNSECURE,
             endpoints: [
                 new PraiseEndpoint(this),
-                // new OneOnOneEndpoint(this),
             ],
         });
+
+        // Slash Commands
+        await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
     }
 }

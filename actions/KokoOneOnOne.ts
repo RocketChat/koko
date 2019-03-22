@@ -22,12 +22,12 @@ export class KokoOneOnOne {
         await persistence.removeByAssociation(oneOnOneAssociation);
         // await persistence.updateByAssociation(oneOnOneAssociation, { count: 0 }, true);
 
-        const members = await this.app.getMembers(read);
+        const members = await this.app.getMembers({ read });
 
         // Sends a request to each member
         members.forEach(async (member) => {
             // Gets or creates a direct message room between botUser and member
-            const room = await this.app.getDirect(read, modify, member.username) as IRoom;
+            const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
 
             // Saves new association record for listening for one-on-one answer
             const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
@@ -101,7 +101,7 @@ export class KokoOneOnOne {
                         .getMessage();
                     await read.getNotifier().notifyUser(message.sender, msg);
 
-                    const room = await this.app.getDirect(read, modify, username) as IRoom;
+                    const room = await this.app.getDirect({ read, modify, username }) as IRoom;
                     const builder = modify.getCreator().startMessage()
                         .setSender(this.app.botUser)
                         .setRoom(room)
