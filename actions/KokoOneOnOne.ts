@@ -1,7 +1,8 @@
 import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { IMessage, MessageActionButtonsAlignment, MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
+import { MessageActionButtonsAlignment, MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
+import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
 import { IListenStorage } from '../storage/IListenStorage';
 
@@ -25,7 +26,12 @@ export class KokoOneOnOne {
         const members = await this.app.getMembers({ read });
 
         // Sends a request to each member
-        members.forEach(async (member) => {
+        for (const member of members) {
+            if (member.id === this.app.botUser.id) {
+                continue;
+            }
+            console.log('XXXXXXXX', member.username);
+
             // Gets or creates a direct message room between botUser and member
             const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
 
@@ -62,10 +68,11 @@ export class KokoOneOnOne {
             } catch (error) {
                 console.log(error);
             }
-        });
+        }
     }
 
-    public async listen(data: IListenStorage, message: IMessage, read: IRead, persistence: IPersistence, modify: IModify) {
+    // tslint:disable-next-line:max-line-length
+    public async answer({ data, text, room, sender, read, persistence, modify }: { data: IListenStorage, text: string, room: IRoom, sender: IUser, read: IRead, persistence: IPersistence, modify: IModify }) {
 
         /**
          * When listening to one-on-one, checks if user answered yes or no
@@ -74,10 +81,10 @@ export class KokoOneOnOne {
          */
         if (data.listen === 'one-on-one') {
             // Removes listening status for user
-            const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
+            const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
             persistence.removeByAssociation(association);
 
-            if (message.text === 'Yes') {
+            if (text === 'Yes') {
                 const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
 
                 // Atomic update association to indicate last user that answered yes
@@ -92,31 +99,32 @@ export class KokoOneOnOne {
                     await persistence.removeByAssociation(oneOnOneAssociation);
 
                     // tslint:disable-next-line:max-line-length
-                    const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)}`;
+                    const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15)}`;
                     const msg = read.getNotifier().getMessageBuilder()
                         .setText(`I found a match for you. Please click [here](${url}) to join your random one-on-one.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                        .setRoom(message.room)
+                        .setRoom(room)
                         .setSender(this.app.botUser)
                         .getMessage();
-                    await read.getNotifier().notifyUser(message.sender, msg);
 
-                    const room = await this.app.getDirect({ read, modify, username }) as IRoom;
+                    const matchRoom = await this.app.getDirect({ read, modify, username }) as IRoom;
                     const builder = modify.getCreator().startMessage()
                         .setSender(this.app.botUser)
-                        .setRoom(room)
+                        .setRoom(matchRoom)
                         .setText(`I found a match for you. Please click [here](${url}) to join your random one-on-one.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar);
+
                     try {
+                        await read.getNotifier().notifyUser(sender, msg);
                         await modify.getCreator().finish(builder);
                     } catch (error) {
                         console.log(error);
                     }
                 } else {
                     await persistence.updateByAssociation(oneOnOneAssociation, {
-                        username: message.sender.username,
+                        username: sender.username,
                     }, true);
 
                     // No one was found waiting, so we wait
@@ -124,21 +132,29 @@ export class KokoOneOnOne {
                         .setText(`Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                        .setRoom(message.room)
+                        .setRoom(room)
                         .setSender(this.app.botUser)
                         .getMessage();
 
-                    await read.getNotifier().notifyUser(message.sender, msg);
+                    try {
+                        await read.getNotifier().notifyUser(sender, msg);
+                    } catch (error) {
+                        console.log(error);
+                    }
                 }
             } else {
                 const msg = read.getNotifier().getMessageBuilder()
                     .setText('Ok :( maybe some other time...')
                     .setUsernameAlias(this.app.kokoName)
                     .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                    .setRoom(message.room)
+                    .setRoom(room)
                     .setSender(this.app.botUser)
                     .getMessage();
-                await read.getNotifier().notifyUser(message.sender, msg);
+                try {
+                    await read.getNotifier().notifyUser(sender, msg);
+                } catch (error) {
+                    console.log(error);
+                }
             }
         }
     }

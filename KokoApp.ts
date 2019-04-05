@@ -10,6 +10,7 @@ import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
 import { KokoCommand } from './commands/KokoCommand';
+import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
 import { IMembersCache } from './IMemberCache';
@@ -207,6 +208,9 @@ export class KokoApp extends App implements IPostMessageSent {
                 case 'answer':
                     await this.kokoQuestion.answer({ text, room, sender, persistence, modify });
                     break;
+                case 'one-on-one':
+                    await this.kokoOneOnOne.answer({ data, text, room, sender, read, persistence, modify });
+                    break;
             }
         }
     }
@@ -324,6 +328,7 @@ export class KokoApp extends App implements IPostMessageSent {
             endpoints: [
                 new PraiseEndpoint(this),
                 new QuestionEndpoint(this),
+                new OneOnOneEndpoint(this),
             ],
         });
 

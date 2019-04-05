@@ -10,8 +10,8 @@ export class OneOnOneEndpoint extends ApiEndpoint {
     }
 
     // tslint:disable-next-line:max-line-length
-    public async get(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        await this.app.kokoOneOnOne.run(read, modify, http, persistence);
+    public async post(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
+        this.app.kokoOneOnOne.run(read, modify, http, persistence);
         return this.success();
     }
 }

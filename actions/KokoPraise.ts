@@ -54,6 +54,10 @@ export class KokoPraise {
 
             // Sends a random message to each member
             for (const member of members) {
+                if (member.id === this.app.botUser.id) {
+                    continue;
+                }
+
                 // Gets or creates a direct message room between botUser and member
                 const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
 

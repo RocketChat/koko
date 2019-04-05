@@ -247,6 +247,10 @@ export class KokoQuestion {
                 await persistence.updateByAssociation(assocQuestion, questionStorage, true);
 
                 for (const member of members) {
+                    if (member.id === this.app.botUser.id) {
+                        continue;
+                    }
+
                     // Saves new association record for listening for the username
                     const assocListen = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
                     const listenStorage: IListenStorage = { listen: 'answer' };
