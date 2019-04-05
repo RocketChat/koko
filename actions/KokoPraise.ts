@@ -4,7 +4,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { IPraiseStorage } from '../storage/IPraiseStorage';
+import { IListenStorage } from '../storage/IListenStorage';
 import { random } from '../utils';
 
 export class KokoPraise {
@@ -24,7 +24,7 @@ export class KokoPraise {
         let members = (await this.app.getMembers({ read }))
             .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
-        if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostRoom !== undefined) {
+        if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostPraiseRoom !== undefined) {
             // Build a list of usernames to add to message attachment
             const users = members
                 .sort((a, b) => {
@@ -59,7 +59,8 @@ export class KokoPraise {
 
                 // Saves new association record for listening for the username
                 const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-                await persistence.updateByAssociation(assoc, { listen: 'username' }, true);
+                const listenStorage: IListenStorage = { listen: 'username' };
+                await persistence.updateByAssociation(assoc, listenStorage, true);
 
                 const builder = modify.getCreator().startMessage()
                     .setSender(this.app.botUser)
@@ -87,13 +88,15 @@ export class KokoPraise {
      * If message is a username, re-selects based on new username
      *
      * @param data the persistence data, indicating what we're listening to
-     * @param message the message to get username or praise from
+     * @param text the message to get username or praise from
+     * @param room the direct room
+     * @param sender the user from direct room
      * @param read
      * @param persistence
      * @param modify
      */
     // tslint:disable-next-line:max-line-length
-    public async answer({ data, text, room, sender, read, persistence, modify }: { data: IPraiseStorage, text: string, room: IRoom, sender: IUser, read: IRead, persistence: IPersistence, modify: IModify }) {
+    public async answer({ data, text, room, sender, read, persistence, modify }: { data: IListenStorage, text: string, room: IRoom, sender: IUser, read: IRead, persistence: IPersistence, modify: IModify }) {
         // Where to save new data
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
 
@@ -175,7 +178,8 @@ export class KokoPraise {
     // tslint:disable-next-line:max-line-length
     private async selectUsername({ username, association, room, sender, modify, persistence }: { username: string, association: RocketChatAssociationRecord, room: IRoom, sender: IUser, modify: IModify, persistence: IPersistence }) {
         // Updates persistence storage with listening for a praise and selected username
-        await persistence.updateByAssociation(association, { listen: 'praise', username }, true);
+        const listenStorage: IListenStorage = { listen: 'praise', username };
+        await persistence.updateByAssociation(association, listenStorage, true);
 
         // Checks if it's a self praise
         let txt;
@@ -196,7 +200,7 @@ export class KokoPraise {
     }
 
     /**
-     * Sends a praise message to kokoPostRoom
+     * Sends a praise message to kokoPostPraiseRoom
      *
      * @param username the username being praised
      * @param text the motive for praising
@@ -219,7 +223,7 @@ export class KokoPraise {
         }
         const message = modify.getCreator().startMessage()
             .setText(msg)
-            .setRoom(this.app.kokoPostRoom)
+            .setRoom(this.app.kokoPostPraiseRoom)
             .setSender(this.app.botUser)
             .setEmojiAvatar(this.app.kokoEmojiAvatar)
             .setUsernameAlias(this.app.kokoName);

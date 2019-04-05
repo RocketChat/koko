@@ -3,7 +3,7 @@ import { IMessage, MessageActionButtonsAlignment, MessageActionType } from '@roc
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { KokoApp } from '../KokoApp';
-import { IPraiseStorage } from '../storage/IPraiseStorage';
+import { IListenStorage } from '../storage/IListenStorage';
 
 export class KokoOneOnOne {
     constructor(private readonly app: KokoApp) { }
@@ -31,7 +31,8 @@ export class KokoOneOnOne {
 
             // Saves new association record for listening for one-on-one answer
             const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-            persistence.updateByAssociation(assoc, { listen: 'one-on-one' }, true);
+            const listenStorage: IListenStorage = { listen: 'one-on-one' };
+            persistence.updateByAssociation(assoc, listenStorage, true);
 
             const builder = modify.getCreator().startMessage()
                 .setSender(this.app.botUser)
@@ -64,7 +65,7 @@ export class KokoOneOnOne {
         });
     }
 
-    public async listen(data: IPraiseStorage, message: IMessage, read: IRead, persistence: IPersistence, modify: IModify) {
+    public async listen(data: IListenStorage, message: IMessage, read: IRead, persistence: IPersistence, modify: IModify) {
 
         /**
          * When listening to one-on-one, checks if user answered yes or no

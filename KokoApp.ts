@@ -8,10 +8,12 @@ import { ISetting, SettingType } from '@rocket.chat/apps-engine/definition/setti
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
+import { KokoQuestion } from './actions/KokoQuestion';
 import { KokoCommand } from './commands/KokoCommand';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
+import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
 import { IMembersCache } from './IMemberCache';
-import { IPraiseStorage } from './storage/IPraiseStorage';
+import { IListenStorage } from './storage/IListenStorage';
 
 export class KokoApp extends App implements IPostMessageSent {
     /**
@@ -37,12 +39,22 @@ export class KokoApp extends App implements IPostMessageSent {
     /**
      * The room name where to post thanks messages to
      */
-    public kokoPostRoomName: string;
+    public kokoPostPraiseRoomName: string;
 
     /**
      * The actual room object where to post thanks messages to
      */
-    public kokoPostRoom: IRoom;
+    public kokoPostPraiseRoom: IRoom;
+
+    /**
+     * The room name where to post answers to
+     */
+    public kokoPostAnswersRoomName: string;
+
+    /**
+     * The actual room object where to post answers to
+     */
+    public kokoPostAnswersRoom: IRoom;
 
     /**
      * The bot username who sends the messages
@@ -58,6 +70,11 @@ export class KokoApp extends App implements IPostMessageSent {
      * The praise mechanism
      */
     public readonly kokoPraise: KokoPraise;
+
+    /**
+     * The question mechanism
+     */
+    public readonly kokoQuestion: KokoQuestion;
 
     /**
      * The random one on one mechanism
@@ -78,6 +95,7 @@ export class KokoApp extends App implements IPostMessageSent {
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
         this.kokoPraise = new KokoPraise(this);
+        this.kokoQuestion = new KokoQuestion(this);
         this.kokoOneOnOne = new KokoOneOnOne(this);
     }
 
@@ -96,9 +114,15 @@ export class KokoApp extends App implements IPostMessageSent {
         } else {
             return false;
         }
-        this.kokoPostRoomName = await environmentRead.getSettings().getValueById('Post_Room_Name');
-        if (this.kokoPostRoomName) {
-            this.kokoPostRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostRoomName) as IRoom;
+        this.kokoPostPraiseRoomName = await environmentRead.getSettings().getValueById('Post_Praise_Room_Name');
+        if (this.kokoPostPraiseRoomName) {
+            this.kokoPostPraiseRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
+        } else {
+            return false;
+        }
+        this.kokoPostAnswersRoomName = await environmentRead.getSettings().getValueById('Post_Answers_Room_Name');
+        if (this.kokoPostAnswersRoomName) {
+            this.kokoPostAnswersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
         } else {
             return false;
         }
@@ -127,10 +151,16 @@ export class KokoApp extends App implements IPostMessageSent {
                     this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
                 }
                 break;
-            case 'Post_Room_Name':
-                this.kokoPostRoomName = setting.value;
-                if (this.kokoPostRoomName) {
-                    this.kokoPostRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostRoomName) as IRoom;
+            case 'Post_Praise_Room_Name':
+                this.kokoPostPraiseRoomName = setting.value;
+                if (this.kokoPostPraiseRoomName) {
+                    this.kokoPostPraiseRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
+                }
+                break;
+            case 'Post_Answers_Room_Name':
+                this.kokoPostAnswersRoomName = setting.value;
+                if (this.kokoPostAnswersRoomName) {
+                    this.kokoPostAnswersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
                 }
                 break;
             case 'Bot_User':
@@ -149,11 +179,11 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     public async checkPostMessageSent(message: IMessage): Promise<boolean> {
         // tslint:disable-next-line:max-line-length
-        return this.botUser !== undefined && this.kokoPostRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUser.id && message.room.id.indexOf(this.botUser.id) !== -1;
+        return this.botUser !== undefined && this.kokoPostPraiseRoom !== undefined && this.kokoPostAnswersRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUser.id && message.room.id.indexOf(this.botUser.id) !== -1;
     }
 
     /**
-     * Checks whether we are listening to username or praise
+     * Checks whether we are listening to username, praise or answer
      *
      * @param message
      * @param read
@@ -165,7 +195,7 @@ export class KokoApp extends App implements IPostMessageSent {
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
         const waitdata = await read.getPersistenceReader().readByAssociation(association);
         if (waitdata && waitdata.length > 0 && waitdata[0]) {
-            const data = waitdata[0] as IPraiseStorage;
+            const data = waitdata[0] as IListenStorage;
             const text = message.text as string;
             const room = message.room;
             const sender = message.sender;
@@ -173,6 +203,9 @@ export class KokoApp extends App implements IPostMessageSent {
                 case 'username':
                 case 'praise':
                     await this.kokoPraise.answer({ data, text, room, sender, read, persistence, modify });
+                    break;
+                case 'answer':
+                    await this.kokoQuestion.answer({ text, room, sender, persistence, modify });
                     break;
             }
         }
@@ -257,13 +290,22 @@ export class KokoApp extends App implements IPostMessageSent {
             i18nDescription: 'Koko_Members_Room_Name_Description',
         });
         await configuration.settings.provideSetting({
-            id: 'Post_Room_Name',
+            id: 'Post_Praise_Room_Name',
             type: SettingType.STRING,
             packageValue: '',
             required: true,
             public: false,
-            i18nLabel: 'Koko_Post_Room_Name',
-            i18nDescription: 'Koko_Post_Room_Name_Description',
+            i18nLabel: 'Koko_Post_Praise_Room_Name',
+            i18nDescription: 'Koko_Post_Praise_Room_Name_Description',
+        });
+        await configuration.settings.provideSetting({
+            id: 'Post_Answers_Room_Name',
+            type: SettingType.STRING,
+            packageValue: '',
+            required: true,
+            public: false,
+            i18nLabel: 'Koko_Post_Answers_Room_Name',
+            i18nDescription: 'Koko_Post_Answers_Room_Name_Description',
         });
         await configuration.settings.provideSetting({
             id: 'Bot_Username',
@@ -281,6 +323,7 @@ export class KokoApp extends App implements IPostMessageSent {
             security: ApiSecurity.UNSECURE,
             endpoints: [
                 new PraiseEndpoint(this),
+                new QuestionEndpoint(this),
             ],
         });
 
