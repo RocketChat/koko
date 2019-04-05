@@ -152,7 +152,7 @@ export class KokoPraise {
      */
     public async getUsernameFromText({ text, read }: { text?: string, read: IRead }): Promise<string | false> {
         // strips the @ from the text to check against room members usernames
-        const username = text ? text.replace(/^@/, '') : false;
+        const username = text ? text.replace(/^@/, '').trim() : false;
         if (username) {
             // Loads members for checking
             const members = await this.app.getMembers({ read });
