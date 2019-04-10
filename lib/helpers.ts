@@ -1,8 +1,23 @@
 import { IModify, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { IMessageAttachment } from '@rocket.chat/apps-engine/definition/messages';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
 import { MembersCache } from '../MembersCache';
+
+/**
+ * Copied from underscore
+ *
+ * @param min
+ * @param max
+ */
+export function random(min: number, max: number): number {
+    if (max == null) {
+        max = min;
+        min = 0;
+    }
+    return min + Math.floor(Math.random() * (max - min + 1));
+}
 
 /**
  * Gets a direct message room between bot and another user, creating if it doesn't exist
@@ -13,7 +28,7 @@ import { MembersCache } from '../MembersCache';
  * @param username the username to create a direct with bot
  * @returns the room or undefined if botUser or botUsername is not set
  */
-export async function getDirect({ app, read, modify, username }: { app: KokoApp, read: IRead, modify: IModify, username: string }): Promise <IRoom | undefined > {
+export async function getDirect(app: KokoApp, read: IRead, modify: IModify, username: string): Promise <IRoom | undefined > {
     if (app.botUsername) {
         const usernames = [app.botUsername, username];
         let room;
@@ -49,7 +64,7 @@ export async function getDirect({ app, read, modify, username }: { app: KokoApp,
  * @param read
  * @returns array of users
  */
-export async function getMembers({ app, read }: { app: KokoApp, read: IRead }): Promise<Array<IUser>> {
+export async function getMembers(app: KokoApp, read: IRead): Promise<Array<IUser>> {
     // Gets cached members if expire date is still valid
     if (app.membersCache && app.membersCache.isValid()) {
         return app.membersCache.members;
@@ -64,4 +79,27 @@ export async function getMembers({ app, read }: { app: KokoApp, read: IRead }): 
         app.membersCache = new MembersCache(members);
     }
     return members || [];
+}
+
+/**
+ * Sends a message using bot
+ *
+ * @param app
+ * @param modify
+ * @param room Where to send message to
+ * @param message What to send
+ * @param attachments (optional) Message attachments (such as action buttons)
+ */
+export async function sendMessage(app: KokoApp, modify: IModify, room: IRoom, message: string, attachments?: Array<IMessageAttachment>): Promise<void> {
+    const msg = modify.getCreator().startMessage()
+        .setGroupable(false)
+        .setSender(app.botUser)
+        .setUsernameAlias(app.kokoName)
+        .setAvatarUrl(app.kokoEmojiAvatar)
+        .setText(message)
+        .setRoom(room);
+    if (attachments && attachments.length > 0) {
+        msg.setAttachments(attachments);
+    }
+    await modify.getCreator().finish(msg);
 }

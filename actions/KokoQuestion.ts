@@ -3,13 +3,13 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers } from '../lib/helpers';
+import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
 import { IAnswerStorage } from '../storage/IAnswerStorage';
 import { IListenStorage } from '../storage/IListenStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
-import { random } from '../utils';
 
 export class KokoQuestion {
+    // List of questions based on https://conversationstartersworld.com
     private questions = [
         'Among your friends or family, what are you famous for?',
         'An app mysteriously appears on your phone that does something amazing. What does it do?',
@@ -226,60 +226,56 @@ export class KokoQuestion {
 
     constructor(private readonly app: KokoApp) {}
 
-    public async run({ read, modify, persistence, user }: { read: IRead, modify: IModify, persistence: IPersistence, user?: IUser }) {
+    public async run(read: IRead, modify: IModify, persistence: IPersistence) {
         if (this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostAnswersRoom !== undefined) {
 
-            let members;
-
-            // Gets room members
-            members = (await getMembers({ app: this.app, read }))
+            // Gets room members (removes rocket.cat and koko bot)
+            const members = (await getMembers(this.app, read))
                 .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
             if (members) {
-                await this.postAnswers({ read, modify, persistence });
+                // Posts previous answers as soon as new questions are being sent
+                await this.postAnswers(read, modify, persistence);
 
+                // Deletes previous answers
                 const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
                 await persistence.removeByAssociation(assocAnswer);
 
-                // Sends the same random question to each member
+                // Saves a random question in storage
                 const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
                 const question = this.questions[random(0, this.questions.length - 1)];
                 const questionStorage: IQuestionStorage = { question };
                 await persistence.updateByAssociation(assocQuestion, questionStorage, true);
 
+                // Sends the same question to each member
                 for (const member of members) {
-                    if (member.id === this.app.botUser.id) {
-                        continue;
-                    }
 
-                    // Saves new association record for listening for the username
+                    // Saves new association record for listening for the answer
                     const assocListen = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
                     const listenStorage: IListenStorage = { listen: 'answer' };
                     await persistence.updateByAssociation(assocListen, listenStorage, true);
 
                     // Gets or creates a direct message room between botUser and member
-                    const room = await getDirect({ app: this.app, read, modify, username: member.username }) as IRoom;
-                    const builder = modify.getCreator().startMessage()
-                        .setSender(this.app.botUser)
-                        .setRoom(room)
-                        .setText(question)
-                        .setUsernameAlias(this.app.kokoName)
-                        .setEmojiAvatar(this.app.kokoEmojiAvatar);
-                    try {
-                        await modify.getCreator().finish(builder);
-                    } catch (error) {
-                        console.log(error);
-                    }
+                    const room = await getDirect(this.app, read, modify, member.username) as IRoom;
+                    await sendMessage(this.app, modify, room, question);
                 }
             }
         }
     }
 
+    /**
+     * Grabs the answer and saves it for posting
+     *
+     * @param modify
+     * @param persistence
+     * @param sender the user from direct room
+     * @param room the direct room
+     * @param text the message to get username or praise from
+     */
     // tslint:disable-next-line:max-line-length
-    public async answer({ text, room, sender, persistence, modify }: { text: string, room: IRoom, sender: IUser, persistence: IPersistence, modify: IModify }) {
-        const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
-
+    public async answer(modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, text: string) {
         // Removes listening record from persistence storage
+        const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
         await persistence.removeByAssociation(association);
 
         // Saves the answer
@@ -287,39 +283,42 @@ export class KokoQuestion {
         const answerStorage: IAnswerStorage = { username: sender.username, answer: text };
         persistence.createWithAssociation(answerStorage, assocAnswer);
 
-        // Notifies user that a praise has been sent
-        const message = modify.getCreator().startMessage()
-            .setText(`Your answer has been registered`)
-            .setRoom(room)
-            .setSender(this.app.botUser)
-            .setEmojiAvatar(this.app.kokoEmojiAvatar)
-            .setUsernameAlias(this.app.kokoName);
-        await modify.getCreator().finish(message);
+        // Notifies user that his answer is saved
+        await sendMessage(this.app, modify, room, `Your answer has been registered`);
     }
 
-    public async postAnswers({ read, modify, persistence }: { read: IRead, modify: IModify, persistence: IPersistence }) {
-        const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
-        const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
-        if (awaitData && awaitData[0]) {
-            const question = awaitData[0] as IQuestionStorage;
-            let text = `*${question.question}*\n---\n`;
-            const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
-            const answers = await read.getPersistenceReader().readByAssociation(assocAnswer);
-            if (answers && answers.length > 0) {
-                answers.forEach((answer: IAnswerStorage) => {
-                    text += `*${answer.username}*: ${answer.answer}\n`;
-                });
-                text += '---';
-                const message = modify.getCreator().startMessage()
-                    .setText(text)
-                    .setRoom(this.app.kokoPostAnswersRoom)
-                    .setSender(this.app.botUser)
-                    .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                    .setUsernameAlias(this.app.kokoName);
-                await modify.getCreator().finish(message);
+    /**
+     * Posts all answer for the previous question
+     *
+     * @param read
+     * @param modify
+     * @param persistence
+     */
+    public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence) {
+        if (this.app.kokoPostAnswersRoom) {
+            const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
+            const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
+            if (awaitData && awaitData[0]) {
+                const question = awaitData[0] as IQuestionStorage;
+
+                // Start building the message that will be sent to answers channel
+                let text = `*${question.question}*\n---\n`;
+                const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
+                const answers = await read.getPersistenceReader().readByAssociation(assocAnswer);
+                if (answers && answers.length > 0) {
+                    answers.forEach((answer: IAnswerStorage) => {
+                        text += `*${answer.username}*: ${answer.answer}\n`;
+                    });
+                    text += '---';
+
+                    // Message is built, send
+                    await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
+                }
+
+                // Remove question and answers from storage
+                await persistence.removeByAssociation(assocQuestion);
+                await persistence.removeByAssociation(assocAnswer);
             }
-            await persistence.removeByAssociation(assocQuestion);
-            await persistence.removeByAssociation(assocAnswer);
         }
     }
 }

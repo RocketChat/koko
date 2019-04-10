@@ -4,9 +4,8 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers } from '../lib/helpers';
+import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
-import { random } from '../utils';
 
 export class KokoPraise {
     constructor(private readonly app: KokoApp) { }
@@ -20,9 +19,10 @@ export class KokoPraise {
      * @param user (optional) sends praise request to single user
      */
     // tslint:disable-next-line:max-line-length
-    public async run({ read, modify, persistence, user }: { read: IRead, modify: IModify, persistence: IPersistence, user?: IUser }) {
-        // Gets room members
-        let members = (await getMembers({ app: this.app, read }))
+    public async run(read: IRead, modify: IModify, persistence: IPersistence, user?: IUser) {
+
+        // Gets room members (removes rocket.cat and koko bot)
+        let members = (await getMembers(this.app, read))
             .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
         if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostPraiseRoom !== undefined) {
@@ -47,41 +47,34 @@ export class KokoPraise {
                 ':rc: praise time :tada: Who deserves your :clapping: this week?',
                 'How about giving praise to someone today?',
             ];
+            const text = praiseQuestions[random(0, praiseQuestions.length - 1)];
 
-            // Overrides members with a single user (slashcommand)
+            // If slashcommand was used, overrides members with the sender
+            // This way only this user will receive the praise request
             if (user !== undefined) {
                 members = [user];
             }
 
-            // Sends a random message to each member
+            // Sends message to each member
             for (const member of members) {
                 if (member.id === this.app.botUser.id) {
                     continue;
                 }
 
                 // Gets or creates a direct message room between botUser and member
-                const room = await getDirect({ app: this.app, read, modify, username: member.username }) as IRoom;
+                const room = await getDirect(this.app, read, modify, member.username) as IRoom;
 
                 // Saves new association record for listening for the username
                 const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
                 const listenStorage: IListenStorage = { listen: 'username' };
                 await persistence.updateByAssociation(assoc, listenStorage, true);
 
-                const builder = modify.getCreator().startMessage()
-                    .setSender(this.app.botUser)
-                    .setRoom(room)
-                    .setText(praiseQuestions[random(0, praiseQuestions.length - 1)])
-                    .setUsernameAlias(this.app.kokoName)
-                    .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                    .addAttachment({
-                        actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
-                        actions: users,
-                    });
-                try {
-                    await modify.getCreator().finish(builder);
-                } catch (error) {
-                    console.log(error);
-                }
+                const attachment = {
+                    actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
+                    actions: users,
+                };
+
+                await sendMessage(this.app, modify, room, text, [attachment]);
             }
         }
         return;
@@ -92,16 +85,16 @@ export class KokoPraise {
      * When listening for praise, checks if message is a username and if not, saves the praise
      * If message is a username, re-selects based on new username
      *
+     * @param read
+     * @param modify
+     * @param persistence
+     * @param sender the user from direct room
+     * @param room the direct room
      * @param data the persistence data, indicating what we're listening to
      * @param text the message to get username or praise from
-     * @param room the direct room
-     * @param sender the user from direct room
-     * @param read
-     * @param persistence
-     * @param modify
      */
     // tslint:disable-next-line:max-line-length
-    public async answer({ data, text, room, sender, read, persistence, modify }: { data: IListenStorage, text: string, room: IRoom, sender: IUser, read: IRead, persistence: IPersistence, modify: IModify }) {
+    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, data: IListenStorage, text: string) {
         // Where to save new data
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
 
@@ -110,41 +103,29 @@ export class KokoPraise {
          * If not, sends a message to the user saying we didn't find a username by that message
          */
         if (data.listen === 'username') {
-            const username = await this.getUsernameFromText({ text, read });
+            const username = await this.getUsernameFromText(read, text);
             if (username) {
-                this.selectUsername({ username, association, room, sender, modify, persistence });
+                this.selectUsername(modify, persistence, sender, room, association, username);
             } else {
-                const message = modify.getCreator().startMessage()
-                    .setText(`I haven't found the username: *${text}*`)
-                    .setRoom(room)
-                    .setSender(this.app.botUser)
-                    .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                    .setUsernameAlias(this.app.kokoName);
-                await modify.getCreator().finish(message);
+                await sendMessage(this.app, modify, room, `I haven't found the username: *${text}*`);
             }
         } else if (data.listen === 'praise') {
             /**
              * When listening to praise, first check if message is a username belonging to members list
              * If it is, select new username
              */
-            const username = await this.getUsernameFromText({ text, read });
+            const username = await this.getUsernameFromText(read, text);
             if (username) {
-                this.selectUsername({ username, association, room, sender, modify, persistence });
+                this.selectUsername(modify, persistence, sender, room, association, username);
             } else {
                 // Removes listening record from persistence storage
                 await persistence.removeByAssociation(association);
 
                 // Sends the praise
-                await this.sendPraise({ username: data.username as string, text, sender, read, modify });
+                await this.sendPraise(modify, sender, data.username as string, text);
 
                 // Notifies user that a praise has been sent
-                const message = modify.getCreator().startMessage()
-                    .setText(`Your praise has been registered`)
-                    .setRoom(room)
-                    .setSender(this.app.botUser)
-                    .setEmojiAvatar(this.app.kokoEmojiAvatar)
-                    .setUsernameAlias(this.app.kokoName);
-                await modify.getCreator().finish(message);
+                await sendMessage(this.app, modify, room, `Your praise has been registered`);
             }
         }
     }
@@ -155,12 +136,12 @@ export class KokoPraise {
      * @param message The text being analyzed
      * @param read IRead
      */
-    public async getUsernameFromText({ text, read }: { text?: string, read: IRead }): Promise<string | false> {
+    public async getUsernameFromText(read: IRead, text?: string): Promise<string | false> {
         // strips the @ from the text to check against room members usernames
         const username = text ? text.replace(/^@/, '').trim() : false;
         if (username) {
             // Loads members for checking
-            const members = await getMembers({ app: this.app, read });
+            const members = await getMembers(this.app, read);
 
             // Returns as soon as one is found
             if (Array.from(members).some((member: IUser) => {
@@ -181,7 +162,7 @@ export class KokoPraise {
      * @param persistence IPersistence
      */
     // tslint:disable-next-line:max-line-length
-    private async selectUsername({ username, association, room, sender, modify, persistence }: { username: string, association: RocketChatAssociationRecord, room: IRoom, sender: IUser, modify: IModify, persistence: IPersistence }) {
+    private async selectUsername(modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, association: RocketChatAssociationRecord, username: string) {
         // Updates persistence storage with listening for a praise and selected username
         const listenStorage: IListenStorage = { listen: 'praise', username };
         await persistence.updateByAssociation(association, listenStorage, true);
@@ -213,7 +194,7 @@ export class KokoPraise {
      * @param read IRead
      * @param modify IModify
      */
-    private async sendPraise({ username, text, sender, read, modify }: { username: string, text: string, sender: IUser, read: IRead, modify: IModify }) {
+    private async sendPraise(modify: IModify, sender: IUser, username: string, text: string) {
         let msg;
         if (sender.username === username) {
             msg = `@${sender.username} praises him- or herself for "${text}"`;
@@ -226,12 +207,6 @@ export class KokoPraise {
             msg = praiseMessages[random(0, praiseMessages.length - 1)];
             msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + username).replace('{text}', text);
         }
-        const message = modify.getCreator().startMessage()
-            .setText(msg)
-            .setRoom(this.app.kokoPostPraiseRoom)
-            .setSender(this.app.botUser)
-            .setEmojiAvatar(this.app.kokoEmojiAvatar)
-            .setUsernameAlias(this.app.kokoName);
-        const msgId = await modify.getCreator().finish(message);
+        await sendMessage(this.app, modify, this.app.kokoPostPraiseRoom, msg);
     }
 }

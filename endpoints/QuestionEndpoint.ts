@@ -11,7 +11,7 @@ export class QuestionEndpoint extends ApiEndpoint {
 
     // tslint:disable-next-line:max-line-length
     public async post(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        this.app.kokoQuestion.run({ read, modify, persistence });
+        this.app.kokoQuestion.run(read, modify, persistence);
         return this.success();
     }
 }
