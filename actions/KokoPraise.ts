@@ -4,6 +4,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
+import { getDirect, getMembers } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 import { random } from '../utils';
 
@@ -21,7 +22,7 @@ export class KokoPraise {
     // tslint:disable-next-line:max-line-length
     public async run({ read, modify, persistence, user }: { read: IRead, modify: IModify, persistence: IPersistence, user?: IUser }) {
         // Gets room members
-        let members = (await this.app.getMembers({ read }))
+        let members = (await getMembers({ app: this.app, read }))
             .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
         if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostPraiseRoom !== undefined) {
@@ -59,7 +60,7 @@ export class KokoPraise {
                 }
 
                 // Gets or creates a direct message room between botUser and member
-                const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
+                const room = await getDirect({ app: this.app, read, modify, username: member.username }) as IRoom;
 
                 // Saves new association record for listening for the username
                 const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
@@ -159,7 +160,7 @@ export class KokoPraise {
         const username = text ? text.replace(/^@/, '').trim() : false;
         if (username) {
             // Loads members for checking
-            const members = await this.app.getMembers({ read });
+            const members = await getMembers({ app: this.app, read });
 
             // Returns as soon as one is found
             if (Array.from(members).some((member: IUser) => {

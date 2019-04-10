@@ -3,6 +3,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
+import { getDirect, getMembers } from '../lib/helpers';
 import { IAnswerStorage } from '../storage/IAnswerStorage';
 import { IListenStorage } from '../storage/IListenStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
@@ -231,7 +232,7 @@ export class KokoQuestion {
             let members;
 
             // Gets room members
-            members = (await this.app.getMembers({ read }))
+            members = (await getMembers({ app: this.app, read }))
                 .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
 
             if (members) {
@@ -257,7 +258,7 @@ export class KokoQuestion {
                     await persistence.updateByAssociation(assocListen, listenStorage, true);
 
                     // Gets or creates a direct message room between botUser and member
-                    const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
+                    const room = await getDirect({ app: this.app, read, modify, username: member.username }) as IRoom;
                     const builder = modify.getCreator().startMessage()
                         .setSender(this.app.botUser)
                         .setRoom(room)

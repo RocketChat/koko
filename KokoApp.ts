@@ -13,7 +13,6 @@ import { KokoCommand } from './commands/KokoCommand';
 import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
-import { getDirect } from './lib/helpers';
 import { MembersCache } from './MembersCache';
 import { settings } from './settings';
 import { IListenStorage } from './storage/IListenStorage';
@@ -186,7 +185,7 @@ export class KokoApp extends App implements IPostMessageSent {
     }
 
     /**
-     * Checks whether we are listening to username, praise or answer
+     * Checks if we are listening for anything in bot's direct room
      *
      * @param message
      * @param read
@@ -195,6 +194,7 @@ export class KokoApp extends App implements IPostMessageSent {
      * @param modify
      */
     public async executePostMessageSent(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
+        // The listen happens on a user level. In other words, each user has its own listening status
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
         const waitdata = await read.getPersistenceReader().readByAssociation(association);
         if (waitdata && waitdata.length > 0 && waitdata[0]) {

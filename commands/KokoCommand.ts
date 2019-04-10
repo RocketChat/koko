@@ -3,6 +3,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { ISlashCommand, SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
 import { KokoApp } from '../KokoApp';
+import { getDirect } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 
 export class KokoCommand implements ISlashCommand {
@@ -38,7 +39,7 @@ export class KokoCommand implements ISlashCommand {
 
     private async processHelpCommand(context: SlashCommandContext, read: IRead, modify: IModify): Promise<void> {
         const user = context.getSender();
-        const room = await this.app.getDirect({ read, modify, username: user.username }) as IRoom;
+        const room = await getDirect({ app: this.app, read, modify, username: user.username }) as IRoom;
         const builder = modify.getCreator().startMessage()
             .setSender(this.app.botUser)
             .setRoom(room)
@@ -61,7 +62,7 @@ export class KokoCommand implements ISlashCommand {
     // tslint:disable-next-line:max-line-length
     private async processCancelCommand({ context, persistence, read, modify }: { context: SlashCommandContext, persistence: IPersistence, read: IRead, modify: IModify }) {
         const sender = context.getSender();
-        const room = await this.app.getDirect({ modify, read, username: sender.username }) as IRoom;
+        const room = await getDirect({ app: this.app, modify, read, username: sender.username }) as IRoom;
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
         await persistence.removeByAssociation(association);
         const message = modify.getCreator().startMessage()
@@ -76,7 +77,7 @@ export class KokoCommand implements ISlashCommand {
     // tslint:disable-next-line:max-line-length
     private async processPraiseCommand({ context, read, params, modify, persistence }: { context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, params?: Array<string> }): Promise<void> {
         const sender = context.getSender();
-        const room = await this.app.getDirect({ modify, read, username: sender.username }) as IRoom;
+        const room = await getDirect({ app: this.app, modify, read, username: sender.username }) as IRoom;
         if (params && params.length > 0 && params[0].trim()) {
             const username = params[0];
             params.shift();

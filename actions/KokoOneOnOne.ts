@@ -4,6 +4,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
+import { getDirect, getMembers } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 
 export class KokoOneOnOne {
@@ -23,7 +24,7 @@ export class KokoOneOnOne {
         await persistence.removeByAssociation(oneOnOneAssociation);
         // await persistence.updateByAssociation(oneOnOneAssociation, { count: 0 }, true);
 
-        const members = await this.app.getMembers({ read });
+        const members = await getMembers({ app: this.app, read });
 
         // Sends a request to each member
         for (const member of members) {
@@ -33,7 +34,7 @@ export class KokoOneOnOne {
             console.log('XXXXXXXX', member.username);
 
             // Gets or creates a direct message room between botUser and member
-            const room = await this.app.getDirect({ read, modify, username: member.username }) as IRoom;
+            const room = await getDirect({ app: this.app, read, modify, username: member.username }) as IRoom;
 
             // Saves new association record for listening for one-on-one answer
             const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
@@ -100,24 +101,21 @@ export class KokoOneOnOne {
 
                     // tslint:disable-next-line:max-line-length
                     const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15)}`;
-                    const msg = read.getNotifier().getMessageBuilder()
+                    const msg = modify.getCreator().startMessage()
                         .setText(`I found a match for you. Please click [here](${url}) to join your random one-on-one.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar)
                         .setRoom(room)
-                        .setSender(this.app.botUser)
-                        .getMessage();
-
-                    const matchRoom = await this.app.getDirect({ read, modify, username }) as IRoom;
+                        .setSender(this.app.botUser);
+                    const matchRoom = await getDirect({ app: this.app, read, modify, username }) as IRoom;
                     const builder = modify.getCreator().startMessage()
                         .setSender(this.app.botUser)
                         .setRoom(matchRoom)
                         .setText(`I found a match for you. Please click [here](${url}) to join your random one-on-one.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar);
-
                     try {
-                        await read.getNotifier().notifyUser(sender, msg);
+                        await modify.getCreator().finish(msg);
                         await modify.getCreator().finish(builder);
                     } catch (error) {
                         console.log(error);
@@ -128,30 +126,28 @@ export class KokoOneOnOne {
                     }, true);
 
                     // No one was found waiting, so we wait
-                    const msg = read.getNotifier().getMessageBuilder()
+                    const msg = modify.getCreator().startMessage()
                         .setText(`Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`)
                         .setUsernameAlias(this.app.kokoName)
                         .setEmojiAvatar(this.app.kokoEmojiAvatar)
                         .setRoom(room)
-                        .setSender(this.app.botUser)
-                        .getMessage();
-
+                        .setSender(this.app.botUser);
                     try {
-                        await read.getNotifier().notifyUser(sender, msg);
+                        await modify.getCreator().finish(msg);
                     } catch (error) {
                         console.log(error);
                     }
                 }
             } else {
-                const msg = read.getNotifier().getMessageBuilder()
+                console.log(this.app.botUser);
+                const msg = modify.getCreator().startMessage()
                     .setText('Ok :( maybe some other time...')
                     .setUsernameAlias(this.app.kokoName)
                     .setEmojiAvatar(this.app.kokoEmojiAvatar)
                     .setRoom(room)
-                    .setSender(this.app.botUser)
-                    .getMessage();
+                    .setSender(this.app.botUser);
                 try {
-                    await read.getNotifier().notifyUser(sender, msg);
+                    await modify.getCreator().finish(msg);
                 } catch (error) {
                     console.log(error);
                 }
