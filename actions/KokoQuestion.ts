@@ -281,10 +281,30 @@ export class KokoQuestion {
         // Saves the answer
         const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
         const answerStorage: IAnswerStorage = { username: sender.username, answer: text };
-        persistence.createWithAssociation(answerStorage, assocAnswer);
+        persistence.updateByAssociation(assocAnswer, answerStorage, true);
 
         // Notifies user that his answer is saved
-        await sendMessage(this.app, modify, room, `Your answer has been registered`);
+        const msg = `Your answer has been registered. If you want to change your answer, type \`/koko question\`.`;
+        await sendMessage(this.app, modify, room, msg);
+    }
+
+    /**
+     * Repeats last question for the selected user
+     */
+    public async repeatQuestion(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser) {
+        const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
+        const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
+        if (awaitData && awaitData[0]) {
+            const question = awaitData[0] as IQuestionStorage;
+
+            // Saves association record for listening for the answer
+            const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
+            const data: IListenStorage = { listen: 'answer' };
+            await persistence.updateByAssociation(association, data, true);
+
+            const room = await getDirect(this.app, read, modify, sender.username) as IRoom;
+            await sendMessage(this.app, modify, room, question.question);
+        }
     }
 
     /**
