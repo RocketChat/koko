@@ -3,6 +3,7 @@ import { ISlashCommand, SlashCommandContext } from '@rocket.chat/apps-engine/def
 import { KokoApp } from '../KokoApp';
 import { processCancelCommand } from './Cancel';
 import { processHelpCommand } from './Help';
+import { processOneOnOneCommand } from './OneOnOne';
 import { processPraiseCommand } from './Praise';
 import { processQuestionCommand } from './Question';
 
@@ -17,6 +18,8 @@ export class KokoCommand implements ISlashCommand {
         Help: 'help',
         Praise: 'praise',
         Question: 'question',
+        OneOnOne: 'one-on-one',
+        OneOnOneNumeral: '1:1',
     };
 
     constructor(private readonly app: KokoApp) { }
@@ -32,6 +35,10 @@ export class KokoCommand implements ISlashCommand {
                 break;
             case this.CommandEnum.Question:
                 await processQuestionCommand(this.app, context, read, modify, persistence);
+                break;
+            case this.CommandEnum.OneOnOne:
+            case this.CommandEnum.OneOnOneNumeral:
+                await processOneOnOneCommand(this.app, context, read, modify, persistence);
                 break;
             case this.CommandEnum.Cancel:
                 await processCancelCommand(this.app, context, read, modify, persistence);

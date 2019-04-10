@@ -14,6 +14,16 @@ export async function processCancelCommand(app: KokoApp, context: SlashCommandCo
     const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
     await persistence.removeByAssociation(association);
 
+    // Remove user from one-on-one waiting list
+    const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
+    const oneOnOneData = await read.getPersistenceReader().readByAssociation(oneOnOneAssociation);
+    if (oneOnOneData && oneOnOneData.length > 0 && oneOnOneData[0]) {
+        const oneOnOne = oneOnOneData[0] as any;
+        if (oneOnOne.username === sender.username) {
+            await persistence.removeByAssociation(oneOnOneAssociation);
+        }
+    }
+
     // Sends message informing user his operations are cancelled
-    await sendMessage(app, modify, room, 'You\'ve cancelled the last operation.');
+    await sendMessage(app, modify, room, 'You\'ve cancelled all operations.');
 }

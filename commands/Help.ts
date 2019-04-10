@@ -10,6 +10,7 @@ export async function processHelpCommand(app: KokoApp, context: SlashCommandCont
     const message = `These are the commands I can understand:
         \`/koko praise\` [@username] [text] Starts a new praise message (username and text are optional)
         \`/koko question\` Repeats last question allowing you to change your answer
+        \`/koko 1:1 (or one-on-one)\` Adds user to the random one-on-one waiting list
         \---
         \`/koko cancel\` Cancels all operations with current user
         \`/koko help\` Shows this message`;
