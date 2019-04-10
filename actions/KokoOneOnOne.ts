@@ -86,30 +86,57 @@ export class KokoOneOnOne {
                 const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
                 const oneOnOneData = await read.getPersistenceReader().readByAssociation(oneOnOneAssociation);
                 if (oneOnOneData && oneOnOneData.length > 0 && oneOnOneData[0]) {
-                    // Previous user found; Remove association to avoid possible race condition sooner
-                    await persistence.removeByAssociation(oneOnOneAssociation);
                     const oneOnOne = oneOnOneData[0] as any;
                     const username = oneOnOne.username;
+                    if (username !== sender.username) {
+                        // Previous user found; Remove association to avoid possible race condition sooner
+                        await persistence.removeByAssociation(oneOnOneAssociation);
 
-                    // Sends a message to the connecting user
-                    const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15)}`;
-                    const message = `I found a match for you. Please click [here](${url}) to join your random one-on-one.`;
-                    await sendMessage(this.app, modify, room, message);
+                        // Sends a message to the connecting user
+                        const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15)}`;
+                        const message = `I found a match for you. Please click [here](${url}) to join your random one-on-one.`;
+                        await sendMessage(this.app, modify, room, message);
 
-                    // Sends a message to the matching user (waiting user)
-                    const matchRoom = await getDirect(this.app, read, modify, username) as IRoom;
-                    await sendMessage(this.app, modify, matchRoom, message);
+                        // Sends a message to the matching user (waiting user)
+                        const matchRoom = await getDirect(this.app, read, modify, username) as IRoom;
+                        await sendMessage(this.app, modify, matchRoom, message);
+                    } else {
+                        await sendMessage(this.app, modify, room, 'You are already on the list.');
+                    }
                 } else {
                     // No one was found waiting, so we wait
                     await persistence.updateByAssociation(oneOnOneAssociation, {
                         username: sender.username,
                     }, true);
-                    const message = `Yay! I've put you on the waiting list. I'll let you know once someone accepts too.`;
-                    await sendMessage(this.app, modify, room, message);
+                    const message = `I've put you on the random 1:1 waiting list. I'll let you know once someone accepts too.
+                    If you'd like to cancel the request, please type \`/koko cancel\` or click the button below.`;
+                    const attachment = {
+                        actions: [
+                            {
+                                type: MessageActionType.BUTTON,
+                                msg: `/koko cancel`,
+                                msg_in_chat_window: true,
+                                text: 'Cancel',
+                            },
+                        ],
+                    };
+                    await sendMessage(this.app, modify, room, message, [attachment]);
                 }
             } else {
                 // User didn't reply with Yes
-                await sendMessage(this.app, modify, room, 'Ok :( maybe some other time...');
+                const message = `Maybe some other time.
+                If you change your mind, just type \`/koko 1:1\` or click the button below and you'll be added to the 1:1 waiting list`;
+                const attachment = {
+                    actions: [
+                        {
+                            type: MessageActionType.BUTTON,
+                            msg: `/koko 1:1`,
+                            msg_in_chat_window: true,
+                            text: 'I changed my mind',
+                        },
+                    ],
+                };
+                await sendMessage(this.app, modify, room, message, [attachment]);
             }
         }
     }
