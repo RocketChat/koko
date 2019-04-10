@@ -4,7 +4,7 @@ import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
-import { ISetting, SettingType } from '@rocket.chat/apps-engine/definition/settings';
+import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
@@ -13,7 +13,9 @@ import { KokoCommand } from './commands/KokoCommand';
 import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
-import { IMembersCache } from './IMemberCache';
+import { getDirect } from './lib/helpers';
+import { MembersCache } from './MembersCache';
+import { settings } from './settings';
 import { IListenStorage } from './storage/IListenStorage';
 
 export class KokoApp extends App implements IPostMessageSent {
@@ -85,13 +87,8 @@ export class KokoApp extends App implements IPostMessageSent {
     /**
      * Members cache
      */
-    private membersCache: IMembersCache;
-
-    /**
-     * Members cache expire time
-     * 300s
-     */
-    private MEMBERS_CACHE_EXPIRE: number = 300000;
+    // tslint:disable-next-line:variable-name
+    private _membersCache: MembersCache;
 
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
@@ -179,8 +176,13 @@ export class KokoApp extends App implements IPostMessageSent {
      * @param message
      */
     public async checkPostMessageSent(message: IMessage): Promise<boolean> {
-        // tslint:disable-next-line:max-line-length
-        return this.botUser !== undefined && this.kokoPostPraiseRoom !== undefined && this.kokoPostAnswersRoom !== undefined && this.kokoMembersRoom !== undefined && message.room.type === RoomType.DIRECT_MESSAGE && message.sender.id !== this.botUser.id && message.room.id.indexOf(this.botUser.id) !== -1;
+        return this.botUser !== undefined &&
+            this.kokoPostPraiseRoom !== undefined &&
+            this.kokoPostAnswersRoom !== undefined &&
+            this.kokoMembersRoom !== undefined &&
+            message.room.type === RoomType.DIRECT_MESSAGE && // Only respond to direct messages
+            message.sender.id !== this.botUser.id && // Do not respond to bot self message
+            message.room.id.indexOf(this.botUser.id) !== -1; // Bot has to be part of the direct room
     }
 
     /**
@@ -216,66 +218,6 @@ export class KokoApp extends App implements IPostMessageSent {
     }
 
     /**
-     * Gets users of room defined by room id setting
-     * Uses simple caching for avoiding repeated database queries
-     *
-     * @param context
-     * @param read
-     * @param modify
-     * @param http
-     * @param persis
-     * @returns array of users
-     */
-    public async getMembers({ read }: { read: IRead }): Promise<Array<IUser>> {
-        if (this.membersCache && this.membersCache.expire > Date.now()) {
-            return this.membersCache.members;
-        }
-        let members;
-        if (this.kokoMembersRoom) {
-            try {
-                members = await read.getRoomReader().getMembers(this.kokoMembersRoom.id);
-            } catch (error) {
-                console.log(error);
-            }
-            this.membersCache = { members, expire: Date.now() + this.MEMBERS_CACHE_EXPIRE };
-        }
-        return members || [];
-    }
-
-    /**
-     * Gets a direct message room between bot and another user, creating if it doesn't exist
-     *
-     * @param context
-     * @param read
-     * @param modify
-     * @param username
-     * @returns the room
-     */
-    public async getDirect({ read, modify, username }: { read: IRead, modify: IModify, username: string }): Promise <IRoom | undefined > {
-        const usernames = [this.botUsername, username];
-        let room;
-        try {
-            room = await read.getRoomReader().getDirectByUsernames(usernames);
-        } catch (error) {
-            console.log(error);
-        }
-
-        if (room) {
-            return room;
-        } else if (this.botUser) {
-            let roomId;
-            const newRoom = modify.getCreator().startRoom()
-                .setType(RoomType.DIRECT_MESSAGE)
-                .setCreator(this.botUser)
-                .setUsernames(usernames);
-            roomId = await modify.getCreator().finish(newRoom);
-            return await read.getRoomReader().getById(roomId);
-        } else {
-            return;
-        }
-    }
-
-    /**
      * Provides a setting for room id where to get members from
      * Provides a setting for room id where to post messages to
      * Provides an API for activating the praise mechanism
@@ -284,42 +226,7 @@ export class KokoApp extends App implements IPostMessageSent {
      */
     protected async extendConfiguration(configuration: IConfigurationExtend): Promise<void> {
         // Settings
-        await configuration.settings.provideSetting({
-            id: 'Members_Room_Name',
-            type: SettingType.STRING,
-            packageValue: '',
-            required: true,
-            public: false,
-            i18nLabel: 'Koko_Members_Room_Name',
-            i18nDescription: 'Koko_Members_Room_Name_Description',
-        });
-        await configuration.settings.provideSetting({
-            id: 'Post_Praise_Room_Name',
-            type: SettingType.STRING,
-            packageValue: '',
-            required: true,
-            public: false,
-            i18nLabel: 'Koko_Post_Praise_Room_Name',
-            i18nDescription: 'Koko_Post_Praise_Room_Name_Description',
-        });
-        await configuration.settings.provideSetting({
-            id: 'Post_Answers_Room_Name',
-            type: SettingType.STRING,
-            packageValue: '',
-            required: true,
-            public: false,
-            i18nLabel: 'Koko_Post_Answers_Room_Name',
-            i18nDescription: 'Koko_Post_Answers_Room_Name_Description',
-        });
-        await configuration.settings.provideSetting({
-            id: 'Bot_Username',
-            type: SettingType.STRING,
-            packageValue: 'rocket.cat',
-            required: true,
-            public: false,
-            i18nLabel: 'Koko_Bot_Username',
-            i18nDescription: 'Koko_Bot_Username_Description',
-        });
+        await Promise.all(settings.map((setting) => configuration.settings.provideSetting(setting)));
 
         // API endpoints
         await configuration.api.provideApi({
@@ -334,5 +241,13 @@ export class KokoApp extends App implements IPostMessageSent {
 
         // Slash Commands
         await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
+    }
+
+    get membersCache(): MembersCache {
+        return this._membersCache;
+    }
+
+    set membersCache(memberCache: MembersCache) {
+        this._membersCache = memberCache;
     }
 }
