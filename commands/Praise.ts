@@ -9,13 +9,13 @@ import { IListenStorage } from '../storage/IListenStorage';
 // tslint:disable-next-line:max-line-length
 export async function processPraiseCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, params?: Array<string>): Promise<void> {
     const sender = context.getSender();
-    const room = await getDirect(this.app, read, modify, sender.username) as IRoom;
     if (params && params.length > 0 && params[0].trim()) {
         // first param is username
         const username = params.shift() as string;
         // all other params compose the message
         let text = params.join(' ');
 
+        const room = await getDirect(app, read, modify, sender.username) as IRoom;
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
         if (await app.kokoPraise.getUsernameFromText(read, username)) {
             // if given username is valid, add username to listening status and wait for text
