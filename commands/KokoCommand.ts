@@ -1,6 +1,7 @@
 import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { ISlashCommand, SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
 import { KokoApp } from '../KokoApp';
+import { getMembers, notifyUser } from '../lib/helpers';
 import { processCancelCommand } from './Cancel';
 import { processHelpCommand } from './Help';
 import { processOneOnOneCommand } from './OneOnOne';
@@ -24,6 +25,15 @@ export class KokoCommand implements ISlashCommand {
 
     constructor(private readonly app: KokoApp) { }
     public async executor(context: SlashCommandContext, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<void> {
+
+        // Gets room members (removes rocket.cat and koko bot)
+        const members = await getMembers(this.app, read);
+        const sender = context.getSender();
+        const room = context.getRoom();
+        if (!(members.some((member) => member.username === sender.username))) {
+            return await notifyUser(this.app, modify, room, sender, `You are not allowed to run this command.`);
+        }
+
         const [command, ...params] = context.getArguments();
         if (!command) {
             return await processHelpCommand(this.app, context, read, modify);

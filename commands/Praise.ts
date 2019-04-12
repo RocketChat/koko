@@ -11,13 +11,13 @@ export async function processPraiseCommand(app: KokoApp, context: SlashCommandCo
     const sender = context.getSender();
     if (params && params.length > 0 && params[0].trim()) {
         // first param is username
-        const username = params.shift() as string;
+        let username = params.shift() as string | boolean;
         // all other params compose the message
-        let text = params.join(' ');
-
+        let text = params.join(' ') as string;
         const room = await getDirect(app, read, modify, sender.username) as IRoom;
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
-        if (await app.kokoPraise.getUsernameFromText(read, username)) {
+        username = await app.kokoPraise.getUsernameFromText(read, username as string);
+        if (username) {
             // if given username is valid, add username to listening status and wait for text
             const data: IListenStorage = { listen: 'praise', username };
             await persistence.updateByAssociation(association, data, true);
@@ -27,7 +27,7 @@ export async function processPraiseCommand(app: KokoApp, context: SlashCommandCo
             // if username isn't valid, listen for valid username
             const data: IListenStorage = { listen: 'username' };
             await persistence.updateByAssociation(association, data, true);
-            text = username;
+            text = username as string;
             await app.kokoPraise.answer(read, modify, persistence, sender, room, data, text);
         }
     } else {

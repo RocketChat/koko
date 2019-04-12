@@ -74,7 +74,7 @@ export async function getMembers(app: KokoApp, read: IRead): Promise<Array<IUser
         try {
             members = await read.getRoomReader().getMembers(app.kokoMembersRoom.id);
         } catch (error) {
-            console.log(error);
+            app.getLogger().log(error);
         }
         app.membersCache = new MembersCache(members);
     }
@@ -101,5 +101,33 @@ export async function sendMessage(app: KokoApp, modify: IModify, room: IRoom, me
     if (attachments && attachments.length > 0) {
         msg.setAttachments(attachments);
     }
-    await modify.getCreator().finish(msg);
+    try {
+        await modify.getCreator().finish(msg);
+    } catch (error) {
+        app.getLogger().log(error);
+    }
+}
+
+/**
+ * Notifies user using bot
+ *
+ * @param app
+ * @param modify
+ * @param user Who to notify
+ * @param message What to send
+ * @param attachments (optional) Message attachments (such as action buttons)
+ */
+export async function notifyUser(app: KokoApp, modify: IModify, room: IRoom, user: IUser, message: string, attachments?: Array<IMessageAttachment>): Promise<void> {
+    const msg = modify.getCreator().startMessage()
+        .setSender(app.botUser)
+        .setUsernameAlias(app.kokoName)
+        .setAvatarUrl(app.kokoEmojiAvatar)
+        .setText(message)
+        .setRoom(room)
+        .getMessage();
+    try {
+        await modify.getNotifier().notifyUser(user, msg);
+    } catch (error) {
+        app.getLogger().log(error);
+    }
 }
