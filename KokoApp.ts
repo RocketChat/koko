@@ -208,7 +208,7 @@ export class KokoApp extends App implements IPostMessageSent {
                     await this.kokoPraise.answer(read, modify, persistence, sender, room, data, text);
                     break;
                 case 'answer':
-                    await this.kokoQuestion.answer(modify, persistence, sender, room, text);
+                    await this.kokoQuestion.answer(read, modify, persistence, sender, room, text);
                     break;
                 case 'one-on-one':
                     await this.kokoOneOnOne.answer(read, modify, persistence, sender, room, data, text);

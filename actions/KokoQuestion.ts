@@ -273,15 +273,28 @@ export class KokoQuestion {
      * @param text the message to get username or praise from
      */
     // tslint:disable-next-line:max-line-length
-    public async answer(modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, text: string) {
+    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, text: string) {
         // Removes listening record from persistence storage
         const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
         await persistence.removeByAssociation(association);
 
         // Saves the answer
-        const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
         const answerStorage: IAnswerStorage = { username: sender.username, answer: text };
-        persistence.updateByAssociation(assocAnswer, answerStorage, true);
+        const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
+        const awaitData = await read.getPersistenceReader().readByAssociation(assocAnswer);
+        let dataExists = false;
+        if (awaitData && awaitData.length > 0) {
+            for (const answer of awaitData) {
+                if ((answer as IAnswerStorage).username === sender.username) {
+                    dataExists = true;
+                    persistence.updateByAssociation(assocAnswer, answerStorage);
+                    break;
+                }
+            }
+        }
+        if (!dataExists) {
+            persistence.createWithAssociation(answerStorage, assocAnswer);
+        }
 
         // Notifies user that his answer is saved
         const msg = `Your answer has been registered. If you want to change your answer, type \`/koko question\`.`;
