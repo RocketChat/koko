@@ -282,19 +282,23 @@ export class KokoQuestion {
         const answerStorage: IAnswerStorage = { username: sender.username, answer: text };
         const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
         const awaitData = await read.getPersistenceReader().readByAssociation(assocAnswer);
-        let dataExists = false;
-        if (awaitData && awaitData.length > 0) {
-            for (const answer of awaitData) {
-                if ((answer as IAnswerStorage).username === sender.username) {
-                    dataExists = true;
-                    persistence.updateByAssociation(assocAnswer, answerStorage);
-                    break;
-                }
-            }
+        const existingData = awaitData && awaitData.length > 0 && awaitData.filter((data) => (data as IAnswerStorage).username === sender.username);
+        if (existingData && existingData[0]) {
+            console.log(existingData);
         }
-        if (!dataExists) {
-            persistence.createWithAssociation(answerStorage, assocAnswer);
-        }
+        // let dataExists = false;
+        // if (awaitData && awaitData.length > 0) {
+        //     for (const answer of awaitData) {
+        //         if ((answer as IAnswerStorage).username === sender.username) {
+        //             dataExists = true;
+        //             persistence.updateByAssociation(assocAnswer, answerStorage);
+        //             break;
+        //         }
+        //     }
+        // }
+        // if (!dataExists) {
+        //     persistence.createWithAssociation(answerStorage, assocAnswer);
+        // }
 
         // Notifies user that his answer is saved
         const msg = `Your answer has been registered. If you want to change your answer, type \`/koko question\`.`;
@@ -335,14 +339,13 @@ export class KokoQuestion {
                 const question = awaitData[0] as IQuestionStorage;
 
                 // Start building the message that will be sent to answers channel
-                let text = `*${question.question}*\n---\n`;
+                let text = `*${question.question}*\n\n`;
                 const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
                 const answers = await read.getPersistenceReader().readByAssociation(assocAnswer);
                 if (answers && answers.length > 0) {
                     answers.forEach((answer: IAnswerStorage) => {
                         text += `*${answer.username}*: ${answer.answer}\n`;
                     });
-                    text += '---';
 
                     // Message is built, send
                     await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
