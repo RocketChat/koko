@@ -4,7 +4,7 @@ import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
-import { IAnswerStorage } from '../storage/IAnswerStorage';
+import { IAnswer, IAnswerStorage } from '../storage/IAnswerStorage';
 import { IListenStorage } from '../storage/IListenStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
 
@@ -279,26 +279,31 @@ export class KokoQuestion {
         await persistence.removeByAssociation(association);
 
         // Saves the answer
-        const answerStorage: IAnswerStorage = { username: sender.username, answer: text };
+        const answer: IAnswer = { username: sender.username, answer: text };
+        let answerStorage: IAnswerStorage;
         const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
         const awaitData = await read.getPersistenceReader().readByAssociation(assocAnswer);
-        const existingData = awaitData && awaitData.length > 0 && awaitData.filter((data) => (data as IAnswerStorage).username === sender.username);
-        if (existingData && existingData[0]) {
-            console.log(existingData);
+        const data = awaitData && awaitData.length > 0 && awaitData[0] as IAnswerStorage;
+        if (!data) {
+            answerStorage = [answer];
+        } else {
+            let indexFound = false;
+            for (const index in data) {
+                if (data.hasOwnProperty(index)) {
+                    const dataAnswer = data[index] as IAnswer;
+                    if (dataAnswer.username === sender.username) {
+                        data[index] = answer;
+                        indexFound = true;
+                        break;
+                    }
+                }
+            }
+            if (!indexFound) {
+                data.push(answer);
+            }
+            answerStorage = data;
         }
-        // let dataExists = false;
-        // if (awaitData && awaitData.length > 0) {
-        //     for (const answer of awaitData) {
-        //         if ((answer as IAnswerStorage).username === sender.username) {
-        //             dataExists = true;
-        //             persistence.updateByAssociation(assocAnswer, answerStorage);
-        //             break;
-        //         }
-        //     }
-        // }
-        // if (!dataExists) {
-        //     persistence.createWithAssociation(answerStorage, assocAnswer);
-        // }
+        persistence.updateByAssociation(assocAnswer, answerStorage, true);
 
         // Notifies user that his answer is saved
         const msg = `Your answer has been registered. If you want to change your answer, type \`/koko question\`.`;
@@ -341,9 +346,10 @@ export class KokoQuestion {
                 // Start building the message that will be sent to answers channel
                 let text = `*${question.question}*\n\n`;
                 const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
-                const answers = await read.getPersistenceReader().readByAssociation(assocAnswer);
-                if (answers && answers.length > 0) {
-                    answers.forEach((answer: IAnswerStorage) => {
+                const answersData = await read.getPersistenceReader().readByAssociation(assocAnswer);
+                if (answersData && answersData.length > 0) {
+                    const answers = answersData[0] as IAnswerStorage;
+                    answers.forEach((answer: IAnswer) => {
                         text += `*${answer.username}*: ${answer.answer}\n`;
                     });
 
