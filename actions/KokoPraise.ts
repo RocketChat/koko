@@ -176,13 +176,7 @@ export class KokoPraise {
         }
 
         // Asks for a praise reason
-        const message = modify.getCreator().startMessage()
-            .setText(txt)
-            .setRoom(room)
-            .setSender(this.app.botUser)
-            .setEmojiAvatar(this.app.kokoEmojiAvatar)
-            .setUsernameAlias(this.app.kokoName);
-        await modify.getCreator().finish(message);
+        await sendMessage(this.app, modify, room, txt);
     }
 
     /**

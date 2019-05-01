@@ -95,7 +95,7 @@ export async function sendMessage(app: KokoApp, modify: IModify, room: IRoom, me
         .setGroupable(false)
         .setSender(app.botUser)
         .setUsernameAlias(app.kokoName)
-        .setAvatarUrl(app.kokoEmojiAvatar)
+        .setEmojiAvatar(app.kokoEmojiAvatar)
         .setText(message)
         .setRoom(room);
     if (attachments && attachments.length > 0) {
@@ -121,7 +121,7 @@ export async function notifyUser(app: KokoApp, modify: IModify, room: IRoom, use
     const msg = modify.getCreator().startMessage()
         .setSender(app.botUser)
         .setUsernameAlias(app.kokoName)
-        .setAvatarUrl(app.kokoEmojiAvatar)
+        .setEmojiAvatar(app.kokoEmojiAvatar)
         .setText(message)
         .setRoom(room)
         .getMessage();
