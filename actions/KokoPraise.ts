@@ -5,6 +5,7 @@ import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
+import { IKarmaStorage } from '../storage/IKarmaStorage';
 import { IListenStorage } from '../storage/IListenStorage';
 
 export class KokoPraise {
@@ -114,15 +115,31 @@ export class KokoPraise {
              * When listening to praise, first check if message is a username belonging to members list
              * If it is, select new username
              */
-            const username = await this.getUsernameFromText(read, text);
+            let username = await this.getUsernameFromText(read, text);
             if (username) {
                 this.selectUsername(modify, persistence, sender, room, association, username);
             } else {
+                username = data.username as string;
+
                 // Removes listening record from persistence storage
                 await persistence.removeByAssociation(association);
 
+                // Increments karma points for praised user
+                const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
+                const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
+                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
+                if (!karma) {
+                    karma = {};
+                }
+                if (karma[username]) {
+                    karma[username]++;
+                } else {
+                    karma[username] = 1;
+                }
+                await persistence.updateByAssociation(karmaAssoc, karma);
+
                 // Sends the praise
-                await this.sendPraise(modify, sender, data.username as string, text);
+                await this.sendPraise(modify, sender, username, text);
 
                 // Notifies user that a praise has been sent
                 await sendMessage(this.app, modify, room, `Your praise has been registered`);
