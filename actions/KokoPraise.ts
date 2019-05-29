@@ -4,7 +4,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
+import { getDirect, getMembers, random, sendMessage, notifyUser } from '../lib/helpers';
 import { IKarmaStorage } from '../storage/IKarmaStorage';
 import { IListenStorage } from '../storage/IListenStorage';
 
@@ -77,8 +77,47 @@ export class KokoPraise {
 
                 await sendMessage(this.app, modify, room, text, [attachment]);
             }
+
+            // Randomly sends karma points
+            if (random(0, 1) === 1) {
+                await this.sendKarmaScoreboard(read, modify, this.app.kokoPostPraiseRoom);
+            }
         }
         return;
+    }
+
+    /**
+     * Sends current scoreboard to the Koko Praise room
+     *
+     * @param read
+     * @param modify
+     */
+    public async sendKarmaScoreboard(read: IRead, modify: IModify, room: IRoom, user?: IUser) {
+        const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
+        const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
+        if (karmaData && karmaData.length > 0 && karmaData[0]) {
+            const karma = karmaData[0] as IKarmaStorage;
+            const sortable = [] as any;
+            for (const key in karma) {
+                if (karma.hasOwnProperty(key)) {
+                    sortable.push([key, karma[key]]);
+                }
+            }
+            sortable.sort((a, b) => b[1] - a[1]);
+            let output = '*Here is the current Karma Scoreboard*:\n';
+            const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
+            let count = 0;
+            for (const key in sortable) {
+                if (sortable.hasOwnProperty(key)) {
+                    output += `${emojis[count] ? emojis[count++] : ':reminder_ribbon: '}@${sortable[key][0]}: ${sortable[key][1]}\n`;
+                }
+            }
+            if (user) {
+                await notifyUser(this.app, modify, room, user, output);
+            } else {
+                await sendMessage(this.app, modify, room, output);
+            }
+        }
     }
 
     /**

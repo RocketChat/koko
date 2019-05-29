@@ -5,7 +5,7 @@ import { getMembers, notifyUser } from '../lib/helpers';
 import { processCancelCommand } from './Cancel';
 import { processHelpCommand } from './Help';
 import { processOneOnOneCommand } from './OneOnOne';
-import { processPraiseCommand } from './Praise';
+import { processPraiseCommand, processScoreCommand } from './Praise';
 import { processQuestionCommand } from './Question';
 
 export class KokoCommand implements ISlashCommand {
@@ -18,6 +18,7 @@ export class KokoCommand implements ISlashCommand {
         Cancel: 'cancel',
         Help: 'help',
         Praise: 'praise',
+        Score: 'score',
         Question: 'question',
         OneOnOne: 'one-on-one',
         OneOnOneNumeral: '1:1',
@@ -43,6 +44,9 @@ export class KokoCommand implements ISlashCommand {
         switch (command) {
             case this.CommandEnum.Praise:
                 await processPraiseCommand(this.app, context, read, modify, persistence, params);
+                break;
+            case this.CommandEnum.Score:
+                await processScoreCommand(this.app, context, read, modify);
                 break;
             case this.CommandEnum.Question:
                 await processQuestionCommand(this.app, context, read, modify, persistence);

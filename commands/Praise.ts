@@ -35,3 +35,8 @@ export async function processPraiseCommand(app: KokoApp, context: SlashCommandCo
         app.kokoPraise.run(read, modify, persistence, sender);
     }
 }
+
+// tslint:disable-next-line:max-line-length
+export async function processScoreCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify): Promise<void> {
+    await app.kokoPraise.sendKarmaScoreboard(read, modify, context.getRoom(), context.getSender());
+}
