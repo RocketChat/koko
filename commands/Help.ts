@@ -9,7 +9,6 @@ export async function processHelpCommand(app: KokoApp, context: SlashCommandCont
     const room = await getDirect(app, read, modify, sender.username) as IRoom;
     const message = `These are the commands I can understand:
         \`/koko praise\` [@username] [text] Starts a new praise message (username and text are optional)
-        \`/koko score\` Shows current karma points scoreboard
         \`/koko question\` Repeats last question allowing you to change your answer
         \`/koko 1:1 (or one-on-one)\` Adds user to the random one-on-one waiting list
         \---

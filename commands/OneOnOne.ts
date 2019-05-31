@@ -7,8 +7,15 @@ import { getDirect } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 
 // tslint:disable-next-line:max-line-length
-export async function processOneOnOneCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence): Promise<void> {
+export async function processOneOnOneCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, params?: Array<string>): Promise<void> {
     const sender = context.getSender();
+    if (params && params.length > 0 && params[0].trim()) {
+        const subcommand = params.shift() as string | boolean;
+        if (subcommand === 'stats') {
+            return await app.kokoOneOnOne.sendStats(app, read, modify, sender, context.getRoom());
+        }
+    }
+
     const room = await getDirect(app, read, modify, sender.username) as IRoom;
 
     // Saves association record for listening for one-on-one answer

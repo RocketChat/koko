@@ -4,8 +4,9 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers, sendMessage } from '../lib/helpers';
+import { getDirect, getMembers, notifyUser, sendMessage } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
+import { IStatsStorage } from '../storage/IStatsStorage';
 
 export class KokoOneOnOne {
     constructor(private readonly app: KokoApp) { }
@@ -100,6 +101,10 @@ export class KokoOneOnOne {
                         // Sends a message to the matching user (waiting user)
                         const matchRoom = await getDirect(this.app, read, modify, username) as IRoom;
                         await sendMessage(this.app, modify, matchRoom, message);
+
+                        const statsAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one-stats');
+                        const stats: IStatsStorage = { username1: username, username2: sender.username, dateTime: new Date() };
+                        await persistence.createWithAssociation(stats, statsAssoc);
                     } else {
                         await sendMessage(this.app, modify, room, 'You are already on the list.');
                     }
@@ -138,6 +143,30 @@ export class KokoOneOnOne {
                 };
                 await sendMessage(this.app, modify, room, message, [attachment]);
             }
+        }
+    }
+
+    /**
+     * Sends past one-on-ones
+     *
+     * @param app
+     * @param read
+     * @param modify
+     * @param sender
+     * @param room
+     */
+    public async sendStats(app: KokoApp, read: IRead, modify: IModify, sender: IUser, room: IRoom) {
+        const statsAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one-stats');
+        const statsData = await read.getPersistenceReader().readByAssociation(statsAssoc);
+        if (statsData && statsData.length > 0) {
+            let message = '';
+            for (const key in statsData) {
+                if (statsData.hasOwnProperty(key)) {
+                    const stats = statsData[key] as IStatsStorage;
+                    message += `${stats.username1} x ${stats.username2} at ${stats.dateTime.toUTCString()}\n`;
+                }
+            }
+            notifyUser(app, modify, room, sender, message);
         }
     }
 }
