@@ -3,6 +3,7 @@ import { MessageActionButtonsAlignment, MessageActionType } from '@rocket.chat/a
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+import { Buffer } from 'buffer';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
 import { IKarmaStorage } from '../storage/IKarmaStorage';
@@ -113,7 +114,8 @@ export class KokoPraise {
                     if (last !== sortable[key][1]) {
                         count++;
                     }
-                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}@${sortable[key][0]}: ${sortable[key][1]}\n`;
+                    const username = Buffer.from(sortable[key][0], 'base64').toString('utf8') as string;
+                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}@${username}: ${sortable[key][1]}\n`;
                     last = sortable[key][1];
                 }
             }
@@ -171,10 +173,11 @@ export class KokoPraise {
                 // Increments karma points for praised user
                 const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
                 const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
-                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
+                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage || [];
                 if (!karma) {
                     karma = {};
                 }
+                username = Buffer.from(username).toString('base64') as string;
                 if (karma[username]) {
                     karma[username]++;
                 } else {
@@ -183,6 +186,7 @@ export class KokoPraise {
                 await persistence.updateByAssociation(karmaAssoc, karma);
 
                 // Sends the praise
+                username = Buffer.from(username, 'base64').toString('utf8') as string;
                 await this.sendPraise(modify, sender, username, text);
 
                 // Notifies user that a praise has been sent

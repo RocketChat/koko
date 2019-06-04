@@ -4,11 +4,48 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers, notifyUser, sendMessage } from '../lib/helpers';
+import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 import { IStatsStorage } from '../storage/IStatsStorage';
 
 export class KokoOneOnOne {
+    private questions = [
+        'What was the first job you ever had?',
+        'What fun plans do you have for the weekend?',
+        'What’s the most fun project you’ve ever worked on?',
+        'How old were you when you had your first job?',
+        'How long can you go without checking your phone?',
+        'Have you ever really kept a New Year’s resolution?',
+        'What would you do if you were home alone and the power went out?',
+        'What shows are you into?',
+        'What do you hope never changes?',
+        'What would you rate 10 / 10?',
+        'What skill would you like to master?',
+        'What takes up too much of your time?',
+        'What’s the farthest you’ve ever been from home?',
+        'Where is the most interesting place you’ve been?',
+        'What are you most likely to become famous for?',
+        'How do you relax after a hard day of work?',
+        'What pets did you have while you were growing up?',
+        'What would be the most amazing adventure to go on?',
+        'What would be your ideal way to spend the weekend?',
+        'What one thing do you really want but can’t afford?',
+        'What is the luckiest thing that has happened to you?',
+        'What are some small things that make your day better?',
+        'What’s the best thing that happened to you last week?',
+        'What are you looking forward to in the coming months?',
+        'What are you interested in that most people haven’t heard of?',
+        'Why did you decide to do the work you are doing now?',
+        'Where do you usually go when you have time off?',
+        'What are you most looking forward to in the next 10 years?',
+        'If you suddenly became a master at woodworking, what would you make?',
+        'What could you give a 40-minute presentation on with absolutely no preparation?',
+        'What amazing thing did you do that no one was around to see?',
+        'What hobby would you get into if time and money weren’t an issue?',
+        'When people come to you for help, what do they usually want help with?',
+        'What would be your first question after waking up from being cryogenically frozen for 100 years?',
+    ];
+
     constructor(private readonly app: KokoApp) { }
 
     /**
@@ -95,12 +132,17 @@ export class KokoOneOnOne {
 
                         // Sends a message to the connecting user
                         const url = `https://jitsi.rocket.chat/koko-${Math.random().toString(36).substring(2, 15)}`;
-                        const message = `I found a match for you. Please click [here](${url}) to join your random one-on-one.`;
-                        await sendMessage(this.app, modify, room, message);
+                        let message = `I found a match for you. Please click [here](${url}) to join your random one-on-one.`;
+                        message += '\nIf you need help with some conversation starters, here is an idea:\n';
+                        let question = this.questions[random(0, this.questions.length - 1)];
+                        let msgWithQuestion = `${message}*${question}*`;
+                        await sendMessage(this.app, modify, room, msgWithQuestion);
 
                         // Sends a message to the matching user (waiting user)
                         const matchRoom = await getDirect(this.app, read, modify, username) as IRoom;
-                        await sendMessage(this.app, modify, matchRoom, message);
+                        question = this.questions[random(0, this.questions.length - 1)];
+                        msgWithQuestion = `${message}*${question}*`;
+                        await sendMessage(this.app, modify, matchRoom, msgWithQuestion);
 
                         const statsAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one-stats');
                         const stats: IStatsStorage = { username1: username, username2: sender.username, dateTime: new Date() };
