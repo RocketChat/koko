@@ -173,7 +173,7 @@ export class KokoPraise {
                 // Increments karma points for praised user
                 const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
                 const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
-                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage || [];
+                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
                 if (!karma) {
                     karma = {};
                 }
