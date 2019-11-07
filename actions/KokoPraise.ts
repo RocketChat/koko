@@ -78,11 +78,6 @@ export class KokoPraise {
 
                 await sendMessage(this.app, modify, room, text, [attachment]);
             }
-
-            // Randomly sends karma points
-            if (random(0, 1) === 1) {
-                await this.sendKarmaScoreboard(read, modify, this.app.kokoPostPraiseRoom);
-            }
         }
         return;
     }
@@ -170,19 +165,32 @@ export class KokoPraise {
                 // Removes listening record from persistence storage
                 await persistence.removeByAssociation(association);
 
-                // Increments karma points for praised user
                 const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
                 const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
                 let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
                 if (!karma) {
                     karma = {};
                 }
-                username = Buffer.from(username).toString('base64') as string;
-                if (karma[username]) {
-                    karma[username]++;
-                } else {
-                    karma[username] = 1;
+
+                // Only increases karma points if it's not a self-praise
+                if (username !== sender.username) {
+                    // Adds 1 karma points to praised user
+                    username = Buffer.from(username).toString('base64') as string;
+                    if (karma[username]) {
+                        karma[username] += 1;
+                    } else {
+                        karma[username] = 1;
+                    }
+
+                    // Adds 1 karma points to user giving praise
+                    const senderUsername = Buffer.from(sender.username).toString('base64') as string;
+                    if (karma[senderUsername]) {
+                        karma[senderUsername] += 1;
+                    } else {
+                        karma[senderUsername] = 1;
+                    }
                 }
+
                 await persistence.updateByAssociation(karmaAssoc, karma);
 
                 // Sends the praise
