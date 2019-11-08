@@ -1,4 +1,5 @@
 import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
@@ -257,7 +258,17 @@ export class KokoQuestion {
 
                     // Gets or creates a direct message room between botUser and member
                     const room = await getDirect(this.app, read, modify, member.username) as IRoom;
-                    await sendMessage(this.app, modify, room, question);
+                    const attachment = {
+                        actions: [
+                            {
+                                type: MessageActionType.BUTTON,
+                                msg: `/koko question`,
+                                msg_in_chat_window: true,
+                                text: 'Repeat question',
+                            },
+                        ],
+                    };
+                    await sendMessage(this.app, modify, room, question, [attachment]);
                 }
             }
         }

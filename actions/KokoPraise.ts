@@ -38,7 +38,7 @@ export class KokoPraise {
                         text: member.name,
                         type: MessageActionType.BUTTON,
                         msg_in_chat_window: true,
-                        msg: `@${member.username}`,
+                        msg: `/koko praise @${member.username}`,
                     };
                 });
 
@@ -189,12 +189,13 @@ export class KokoPraise {
                     } else {
                         karma[senderUsername] = 1;
                     }
+
+                    username = Buffer.from(username, 'base64').toString('utf8') as string;
                 }
 
                 await persistence.updateByAssociation(karmaAssoc, karma);
 
                 // Sends the praise
-                username = Buffer.from(username, 'base64').toString('utf8') as string;
                 await this.sendPraise(modify, sender, username, text);
 
                 // Notifies user that a praise has been sent

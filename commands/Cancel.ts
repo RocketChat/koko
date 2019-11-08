@@ -3,7 +3,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
 import { KokoApp } from '../KokoApp';
-import { getDirect, sendMessage } from '../lib/helpers';
+import { getDirect, notifyUser } from '../lib/helpers';
 
 // tslint:disable-next-line:max-line-length
 export async function processCancelCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence): Promise<void> {
@@ -25,5 +25,5 @@ export async function processCancelCommand(app: KokoApp, context: SlashCommandCo
     }
 
     // Sends message informing user his operations are cancelled
-    await sendMessage(app, modify, room, 'You\'ve cancelled all operations.');
+    await notifyUser(app, modify, room, sender, 'Cancelled.');
 }
