@@ -1,5 +1,6 @@
 import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { ISlashCommand, SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
+
 import { KokoApp } from '../KokoApp';
 import { getMembers, notifyUser } from '../lib/helpers';
 import { processCancelCommand } from './Cancel';
@@ -31,7 +32,7 @@ export class KokoCommand implements ISlashCommand {
         const members = await getMembers(this.app, read);
         const sender = context.getSender();
         const room = context.getRoom();
-        console.log(members);
+
         if (!(members.some((member) => member.username === sender.username))) {
             return await notifyUser(this.app, modify, room, sender, `You are not allowed to run this command.`);
         }

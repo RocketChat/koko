@@ -1,14 +1,14 @@
 import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
+import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { Buffer } from 'buffer';
 
 import { createPraiseBlocks } from '../blocks/PraiseBlocks';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
-import { IKarmaStorage } from '../storage/IKarmaStorage';
-import { IListenStorage } from '../storage/IListenStorage';
+import { IKarmaStorage, IPraiserKarmaStorage } from '../storage/IKarmaStorage';
 
 export class KokoPraise {
     constructor(private readonly app: KokoApp) { }
@@ -53,17 +53,6 @@ export class KokoPraise {
 
                 // Creates praise blocks
                 const blocks = createPraiseBlocks(modify, text);
-
-                // Saves new association record for listening for the username
-                // const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-                // const listenStorage: IListenStorage = { listen: 'username' };
-                // await persistence.updateByAssociation(assoc, listenStorage, true);
-
-                // const attachment = {
-                //     actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
-                //     actions: users,
-                // };
-
                 await sendMessage(this.app, modify, room, '', [], blocks);
             }
         }
@@ -76,7 +65,9 @@ export class KokoPraise {
      * @param read
      * @param modify
      */
-    public async sendKarmaScoreboard(read: IRead, modify: IModify, room: IRoom, user?: IUser) {
+    public async sendKarmaScoreboard(read: IRead, modify: IModify, room: IRoom, user: IUser) {
+        let output = '';
+
         const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
         const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
         if (karmaData && karmaData.length > 0 && karmaData[0]) {
@@ -88,7 +79,7 @@ export class KokoPraise {
                 }
             }
             sortable.sort((a, b) => b[1] - a[1]);
-            let output = '*Here is the current Karma Scoreboard*:\n';
+            output += '*Here is the current Karma Scoreboard*:\n';
             const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
             let count = -1;
             let last;
@@ -98,98 +89,71 @@ export class KokoPraise {
                         count++;
                     }
                     const username = Buffer.from(sortable[key][0], 'base64').toString('utf8') as string;
-                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}@${username}: ${sortable[key][1]}\n`;
+                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${sortable[key][1]}\n`;
                     last = sortable[key][1];
                 }
             }
-            if (user) {
-                await notifyUser(this.app, modify, room, user, output);
-            } else {
-                await sendMessage(this.app, modify, room, output);
+        }
+
+        const praiserKarmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'praiserKarma');
+        const praiserKarmaData = await read.getPersistenceReader().readByAssociation(praiserKarmaAssoc);
+        if (praiserKarmaData && praiserKarmaData.length > 0 && praiserKarmaData[0]) {
+            const praiserKarma = praiserKarmaData[0] as IPraiserKarmaStorage;
+            const praiserSortable = [] as any;
+            for (const key in praiserKarma) {
+                if (praiserKarma.hasOwnProperty(key)) {
+                    praiserSortable.push([key, praiserKarma[key]]);
+                }
             }
+            praiserSortable.sort((a, b) => b[1] - a[1]);
+            output += '\n*Here is the current Praiser Scoreboard*:\n';
+            const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
+            let count = -1;
+            let last;
+            for (const key in praiserSortable) {
+                if (praiserSortable.hasOwnProperty(key)) {
+                    if (last !== praiserSortable[key][1]) {
+                        count++;
+                    }
+                    const username = Buffer.from(praiserSortable[key][0], 'base64').toString('utf8') as string;
+                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${praiserSortable[key][1]}\n`;
+                    last = praiserSortable[key][1];
+                }
+            }
+        }
+
+        if (output) {
+            await notifyUser(this.app, modify, room, user, output);
         }
     }
 
     /**
-     * When listening for username, checks if message is a username belonging to members list
-     * When listening for praise, checks if message is a username and if not, saves the praise
-     * If message is a username, re-selects based on new username
-     *
-     * @param read
-     * @param modify
-     * @param persistence
-     * @param sender the user from direct room
-     * @param room the direct room
-     * @param data the persistence data, indicating what we're listening to
-     * @param text the message to get username or praise from
+     * Checks if usernames have been selected and reason is given
+     * Then sends a praise to the selected users
      */
     // tslint:disable-next-line:max-line-length
-    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, data: IListenStorage, text: string) {
-        // Where to save new data
-        const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
-
-        /**
-         * When listening to username, checks if message is a username belonging to the members list
-         * If not, sends a message to the user saying we didn't find a username by that message
-         */
-        if (data.listen === 'username') {
-            const username = await this.getUsernameFromText(read, text);
-            if (username) {
-                this.selectUsername(modify, persistence, sender, room, association, username);
-            } else {
-                await sendMessage(this.app, modify, room, `I haven't found the username: *${text}*`);
-            }
-        } else if (data.listen === 'praise') {
-            /**
-             * When listening to praise, first check if message is a username belonging to members list
-             * If it is, select new username
-             */
-            let username = await this.getUsernameFromText(read, text);
-            if (username) {
-                this.selectUsername(modify, persistence, sender, room, association, username);
-            } else {
-                username = data.username as string;
-
-                // Removes listening record from persistence storage
-                await persistence.removeByAssociation(association);
-
-                const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
-                const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
-                let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
-                if (!karma) {
-                    karma = {};
-                }
-
-                // Only increases karma points if it's not a self-praise
-                if (username !== sender.username) {
-                    // Adds 1 karma points to praised user
-                    username = Buffer.from(username).toString('base64') as string;
-                    if (karma[username]) {
-                        karma[username] += 1;
-                    } else {
-                        karma[username] = 1;
-                    }
-
-                    // Adds 1 karma points to user giving praise
-                    const senderUsername = Buffer.from(sender.username).toString('base64') as string;
-                    if (karma[senderUsername]) {
-                        karma[senderUsername] += 1;
-                    } else {
-                        karma[senderUsername] = 1;
-                    }
-
-                    username = Buffer.from(username, 'base64').toString('utf8') as string;
-                }
-
-                await persistence.updateByAssociation(karmaAssoc, karma);
-
-                // Sends the praise
-                await this.sendPraise(modify, sender, [username], text);
-
-                // Notifies user that a praise has been sent
-                await sendMessage(this.app, modify, room, `Your praise has been registered`);
-            }
+    public async submit({ context, modify, read, persistence }: { context: UIKitViewSubmitInteractionContext, modify: IModify, read: IRead, persistence: IPersistence }) {
+        const data = context.getInteractionData();
+        const { praise }: {
+            praise: {
+                who: Array<string>,
+                why: string,
+            },
+        } = data.view.state as any;
+        const errors = {} as any;
+        if (praise === undefined || praise.who === undefined || praise.who.length === 0) {
+            errors.who = 'Please select at least one user';
         }
+        if (praise === undefined || praise.why === undefined || praise.why.length === 0) {
+            errors.why = 'Please type a reason';
+        }
+        if (Object.keys(errors).length > 0) {
+            return context.getInteractionResponder().viewErrorResponse({
+                viewId: data.view.id,
+                errors,
+            });
+        }
+        return await this.sendPraise(read, modify, persistence, data.user, praise.who, praise.why);
     }
 
     /**
@@ -224,14 +188,47 @@ export class KokoPraise {
      * @param read IRead
      * @param modify IModify
      */
-    public async sendPraise(modify: IModify, sender: IUser, usernames: Array<string>, text: string) {
+    private async sendPraise(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, usernames: Array<string>, text: string) {
+        const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
+        const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
+        let karma = karmaData && karmaData.length > 0 && karmaData[0] as IKarmaStorage;
+        if (!karma) {
+            karma = {};
+        }
+
+        for (let username of usernames) {
+            // Adds 1 karma points to praised user
+            username = Buffer.from(username).toString('base64') as string;
+            if (karma[username]) {
+                karma[username] += 1;
+            } else {
+                karma[username] = 1;
+            }
+        }
+        await persistence.updateByAssociation(karmaAssoc, karma);
+
+        const praiserKarmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'praiserKarma');
+        const praiserKarmaData = await read.getPersistenceReader().readByAssociation(praiserKarmaAssoc);
+        let praiserKarma = praiserKarmaData && praiserKarmaData.length > 0 && praiserKarmaData[0] as IPraiserKarmaStorage;
+        if (!praiserKarma) {
+            praiserKarma = {};
+        }
+
+        const senderUsername = Buffer.from(sender.username).toString('base64') as string;
+        if (praiserKarma[senderUsername]) {
+            praiserKarma[senderUsername] += 1;
+        } else {
+            praiserKarma[senderUsername] = 1;
+        }
+        await persistence.updateByAssociation(praiserKarmaAssoc, praiserKarma);
+
         let msg;
-        let username;
+        let replaceUsernames;
         if (usernames.length === 1) {
-            username = usernames[0];
+            replaceUsernames = usernames[0];
         } else {
             const lastUsername = usernames.pop();
-            username = usernames.join(', @') + ` and @${lastUsername}`;
+            replaceUsernames = usernames.join(', @') + ` and @${lastUsername}`;
         }
 
         const praiseMessages = [
@@ -240,33 +237,7 @@ export class KokoPraise {
             '@sender thinks @username did a good job on "{text}"',
         ];
         msg = praiseMessages[random(0, praiseMessages.length - 1)];
-        msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + username).replace('{text}', text);
+        msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + replaceUsernames).replace('{text}', text);
         await sendMessage(this.app, modify, this.app.kokoPostPraiseRoom, msg);
-    }
-
-    /**
-     * Saves the selected username in persistence storage and asks for a praise reason
-     * @param username selected username
-     * @param association where to save the username
-     * @param message original message to get sender from
-     * @param read IRead
-     * @param persistence IPersistence
-     */
-    // tslint:disable-next-line:max-line-length
-    private async selectUsername(modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, association: RocketChatAssociationRecord, username: string) {
-        // Updates persistence storage with listening for a praise and selected username
-        const listenStorage: IListenStorage = { listen: 'praise', username };
-        await persistence.updateByAssociation(association, listenStorage, true);
-
-        // Checks if it's a self praise
-        let txt;
-        if (sender && sender.username === username) {
-            txt = 'What did you do so well that deserves your own thanks?';
-        } else {
-            txt = `What would you like to praise @${username} for?`;
-        }
-
-        // Asks for a praise reason
-        await sendMessage(this.app, modify, room, txt);
     }
 }

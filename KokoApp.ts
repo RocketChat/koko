@@ -11,13 +11,8 @@ import {
 } from '@rocket.chat/apps-engine/definition/accessors';
 import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
-import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
-import {
-    IAppInfo,
-    RocketChatAssociationModel,
-    RocketChatAssociationRecord,
-} from '@rocket.chat/apps-engine/definition/metadata';
-import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
+import { IAppInfo } from '@rocket.chat/apps-engine/definition/metadata';
+import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
 import {
     IUIKitInteractionHandler,
@@ -36,9 +31,8 @@ import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
 import { MembersCache } from './MembersCache';
 import { praiseModal } from './modals/PraiseModal';
 import { settings } from './settings';
-import { IListenStorage } from './storage/IListenStorage';
 
-export class KokoApp extends App implements IPostMessageSent, IUIKitInteractionHandler {
+export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
      * The bot username alias
      */
@@ -124,26 +118,7 @@ export class KokoApp extends App implements IPostMessageSent, IUIKitInteractionH
         const data = context.getInteractionData();
         switch (data.view.id) {
             case 'praise':
-                const { praise }: {
-                        praise: {
-                            who: Array<string>,
-                            why: string,
-                        },
-                } = data.view.state as any;
-                const errors = {} as any;
-                if (praise === undefined || praise.who === undefined || praise.who.length === 0) {
-                    errors.who = 'Please select at least one user';
-                }
-                if (praise === undefined || praise.why === undefined || praise.why.length === 0) {
-                    errors.why = 'Please type a reason';
-                }
-                if (Object.keys(errors).length > 0) {
-                    return context.getInteractionResponder().viewErrorResponse({
-                        viewId: data.view.id,
-                        errors,
-                    });
-                }
-                await this.kokoPraise.sendPraise(modify, data.user, praise.who, praise.why);
+                this.kokoPraise.submit({ context, modify, read, persistence });
                 break;
         }
         return {
@@ -237,54 +212,6 @@ export class KokoApp extends App implements IPostMessageSent, IUIKitInteractionH
                     this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
                 }
                 break;
-        }
-    }
-
-    /**
-     * We'll ignore any message that is not a direct message between bot and user
-     *
-     * @param message
-     */
-    public async checkPostMessageSent(message: IMessage): Promise<boolean> {
-        return this.botUser !== undefined &&
-            this.kokoPostPraiseRoom !== undefined &&
-            this.kokoPostAnswersRoom !== undefined &&
-            this.kokoMembersRoom !== undefined &&
-            message.room.type === RoomType.DIRECT_MESSAGE && // Only respond to direct messages
-            message.sender.id !== this.botUser.id && // Do not respond to bot self message
-            message.room.id.indexOf(this.botUser.id) !== -1; // Bot has to be part of the direct room
-    }
-
-    /**
-     * Checks if we are listening for anything in bot's direct room
-     *
-     * @param message
-     * @param read
-     * @param http
-     * @param persistence
-     * @param modify
-     */
-    public async executePostMessageSent(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
-        // The listen happens on a user level. In other words, each user has its own listening status
-        const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, message.sender.id);
-        const waitdata = await read.getPersistenceReader().readByAssociation(association);
-        if (waitdata && waitdata.length > 0 && waitdata[0]) {
-            const data = waitdata[0] as IListenStorage;
-            const text = message.text as string;
-            const room = message.room;
-            const sender = message.sender;
-            switch (data.listen) {
-                case 'username':
-                case 'praise':
-                    await this.kokoPraise.answer(read, modify, persistence, sender, room, data, text);
-                    break;
-                case 'answer':
-                    await this.kokoQuestion.answer(read, modify, persistence, sender, room, text);
-                    break;
-                case 'one-on-one':
-                    await this.kokoOneOnOne.answer(read, modify, persistence, sender, room, data, text);
-                    break;
-            }
         }
     }
 
