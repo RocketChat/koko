@@ -7,7 +7,6 @@ import { processHelpCommand } from './Help';
 import { processOneOnOneCommand } from './OneOnOne';
 import { processPraiseCommand } from './Praise';
 import { processQuestionCommand } from './Question';
-import { processSendCommand } from './Send';
 
 export class KokoCommand implements ISlashCommand {
     public command = 'koko';
@@ -55,9 +54,6 @@ export class KokoCommand implements ISlashCommand {
                 break;
             case this.CommandEnum.Cancel:
                 await processCancelCommand(this.app, context, read, modify, persistence);
-                break;
-            case this.CommandEnum.Send:
-                await processSendCommand(this.app, context, read, modify, persistence, params);
                 break;
             default:
                 await processHelpCommand(this.app, context, read, modify);
