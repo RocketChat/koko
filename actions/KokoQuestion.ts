@@ -231,8 +231,7 @@ export class KokoQuestion {
         if (this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostAnswersRoom !== undefined) {
 
             // Gets room members (removes rocket.cat and koko bot)
-            const members = (await getMembers(this.app, read))
-                .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
+            const members = await getMembers(this.app, read);
 
             if (members) {
                 // Posts previous answers as soon as new questions are being sent

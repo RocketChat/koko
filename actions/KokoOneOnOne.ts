@@ -62,8 +62,7 @@ export class KokoOneOnOne {
         await persistence.removeByAssociation(oneOnOneAssociation);
 
         // Gets room members (removes rocket.cat and koko bot)
-        const members = (await getMembers(this.app, read))
-            .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
+        const members = await getMembers(this.app, read);
 
         // Sends a request to each member
         for (const member of members) {
