@@ -1,7 +1,9 @@
 import { IModify, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { IMessageAttachment } from '@rocket.chat/apps-engine/definition/messages';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
+import { BlockBuilder } from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+
 import { KokoApp } from '../KokoApp';
 import { MembersCache } from '../MembersCache';
 
@@ -78,7 +80,7 @@ export async function getMembers(app: KokoApp, read: IRead): Promise<Array<IUser
         }
         app.membersCache = new MembersCache(members);
     }
-    return members || [];
+    return members.filter((member) => member.username !== 'rocket.cat' && member.username !== app.botUsername) || [];
 }
 
 /**
@@ -90,16 +92,21 @@ export async function getMembers(app: KokoApp, read: IRead): Promise<Array<IUser
  * @param message What to send
  * @param attachments (optional) Message attachments (such as action buttons)
  */
-export async function sendMessage(app: KokoApp, modify: IModify, room: IRoom, message: string, attachments?: Array<IMessageAttachment>): Promise<void> {
+export async function sendMessage(app: KokoApp, modify: IModify, room: IRoom, message?: string, attachments?: Array<IMessageAttachment>, blocks?: BlockBuilder): Promise<void> {
     const msg = modify.getCreator().startMessage()
         .setGroupable(false)
         .setSender(app.botUser)
         .setUsernameAlias(app.kokoName)
         .setEmojiAvatar(app.kokoEmojiAvatar)
-        .setText(message)
         .setRoom(room);
+    if (message && message.length > 0) {
+        msg.setText(message);
+    }
     if (attachments && attachments.length > 0) {
         msg.setAttachments(attachments);
+    }
+    if (blocks !== undefined) {
+        msg.setBlocks(blocks);
     }
     try {
         await modify.getCreator().finish(msg);

@@ -1,11 +1,31 @@
-import { IAppAccessors, IConfigurationExtend, IConfigurationModify, IEnvironmentRead, IHttp, ILogger, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import {
+    IAppAccessors,
+    IConfigurationExtend,
+    IConfigurationModify,
+    IEnvironmentRead,
+    IHttp,
+    ILogger,
+    IModify,
+    IPersistence,
+    IRead,
+} from '@rocket.chat/apps-engine/definition/accessors';
 import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
-import { IAppInfo, RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
+import {
+    IAppInfo,
+    RocketChatAssociationModel,
+    RocketChatAssociationRecord,
+} from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom, RoomType } from '@rocket.chat/apps-engine/definition/rooms';
 import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
+import {
+    IUIKitInteractionHandler,
+    UIKitBlockInteractionContext,
+    UIKitViewSubmitInteractionContext,
+} from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
@@ -14,10 +34,11 @@ import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
 import { MembersCache } from './MembersCache';
+import { praiseModal } from './modals/PraiseModal';
 import { settings } from './settings';
 import { IListenStorage } from './storage/IListenStorage';
 
-export class KokoApp extends App implements IPostMessageSent {
+export class KokoApp extends App implements IPostMessageSent, IUIKitInteractionHandler {
     /**
      * The bot username alias
      */
@@ -94,6 +115,56 @@ export class KokoApp extends App implements IPostMessageSent {
         this.kokoPraise = new KokoPraise(this);
         this.kokoQuestion = new KokoQuestion(this);
         this.kokoOneOnOne = new KokoOneOnOne(this);
+    }
+
+    /**
+     * Sends a praise or answers a question
+     */
+    public async executeViewSubmitHandler(context: UIKitViewSubmitInteractionContext, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify) {
+        const data = context.getInteractionData();
+        switch (data.view.id) {
+            case 'praise':
+                const { praise }: {
+                        praise: {
+                            who: Array<string>,
+                            why: string,
+                        },
+                } = data.view.state as any;
+                const errors = {} as any;
+                if (praise === undefined || praise.who === undefined || praise.who.length === 0) {
+                    errors.who = 'Please select at least one user';
+                }
+                if (praise === undefined || praise.why === undefined || praise.why.length === 0) {
+                    errors.why = 'Please type a reason';
+                }
+                if (Object.keys(errors).length > 0) {
+                    return context.getInteractionResponder().viewErrorResponse({
+                        viewId: data.view.id,
+                        errors,
+                    });
+                }
+                await this.kokoPraise.sendPraise(modify, data.user, praise.who, praise.why);
+                break;
+        }
+        return {
+            success: true,
+        };
+    }
+
+    /**
+     * Implements the click of a button
+     */
+    public async executeBlockActionHandler(context: UIKitBlockInteractionContext, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify) {
+        const data = context.getInteractionData();
+        switch (data.actionId) {
+            case 'praise': {
+                const modal = await praiseModal({ app: this, data, read, modify });
+                return context.getInteractionResponder().openModalViewResponse(modal);
+            }
+        }
+        return {
+            success: true,
+        };
     }
 
     /**

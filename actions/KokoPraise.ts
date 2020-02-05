@@ -1,9 +1,10 @@
 import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { MessageActionButtonsAlignment, MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { Buffer } from 'buffer';
+
+import { createPraiseBlocks } from '../blocks/PraiseBlocks';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
 import { IKarmaStorage } from '../storage/IKarmaStorage';
@@ -24,29 +25,13 @@ export class KokoPraise {
     public async run(read: IRead, modify: IModify, persistence: IPersistence, user?: IUser) {
 
         // Gets room members (removes rocket.cat and koko bot)
-        let members = (await getMembers(this.app, read))
-            .filter((member) => member.username !== 'rocket.cat' && member.username !== this.app.botUsername);
+        let members = await getMembers(this.app, read);
 
         if (members && this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostPraiseRoom !== undefined) {
-            // Build a list of usernames to add to message attachment
-            const users = members
-                .sort((a, b) => {
-                    return a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1;
-                })
-                .map((member) => {
-                    return {
-                        text: member.name,
-                        type: MessageActionType.BUTTON,
-                        msg_in_chat_window: true,
-                        msg: `/koko praise @${member.username}`,
-                    };
-                });
-
-            // Randomize praise request message
+              // Randomize praise request message
             const praiseQuestions = [
                 'Hello :vulcan: would you like to praise someone today?',
-                'I\'m sure someone did something good recently. Who deserves your thanks?',
-                ':rc: praise time :tada: Who deserves your :clapping: this week?',
+                'I\'m sure someone did something good recently. How about saying thanks?',
                 'How about giving praise to someone today?',
             ];
             const text = praiseQuestions[random(0, praiseQuestions.length - 1)];
@@ -66,17 +51,20 @@ export class KokoPraise {
                 // Gets or creates a direct message room between botUser and member
                 const room = await getDirect(this.app, read, modify, member.username) as IRoom;
 
+                // Creates praise blocks
+                const blocks = createPraiseBlocks(modify, text);
+
                 // Saves new association record for listening for the username
-                const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-                const listenStorage: IListenStorage = { listen: 'username' };
-                await persistence.updateByAssociation(assoc, listenStorage, true);
+                // const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
+                // const listenStorage: IListenStorage = { listen: 'username' };
+                // await persistence.updateByAssociation(assoc, listenStorage, true);
 
-                const attachment = {
-                    actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
-                    actions: users,
-                };
+                // const attachment = {
+                //     actionButtonsAlignment: MessageActionButtonsAlignment.HORIZONTAL,
+                //     actions: users,
+                // };
 
-                await sendMessage(this.app, modify, room, text, [attachment]);
+                await sendMessage(this.app, modify, room, '', [], blocks);
             }
         }
         return;
@@ -196,7 +184,7 @@ export class KokoPraise {
                 await persistence.updateByAssociation(karmaAssoc, karma);
 
                 // Sends the praise
-                await this.sendPraise(modify, sender, username, text);
+                await this.sendPraise(modify, sender, [username], text);
 
                 // Notifies user that a praise has been sent
                 await sendMessage(this.app, modify, room, `Your praise has been registered`);
@@ -228,6 +216,35 @@ export class KokoPraise {
     }
 
     /**
+     * Sends a praise message to kokoPostPraiseRoom
+     *
+     * @param username the username being praised
+     * @param text the motive for praising
+     * @param sender the user sending a praise
+     * @param read IRead
+     * @param modify IModify
+     */
+    public async sendPraise(modify: IModify, sender: IUser, usernames: Array<string>, text: string) {
+        let msg;
+        let username;
+        if (usernames.length === 1) {
+            username = usernames[0];
+        } else {
+            const lastUsername = usernames.pop();
+            username = usernames.join(', @') + ` and @${lastUsername}`;
+        }
+
+        const praiseMessages = [
+            '@sender says thanks to @username for "{text}"',
+            '@sender gives @username kudos for "{text}"',
+            '@sender thinks @username did a good job on "{text}"',
+        ];
+        msg = praiseMessages[random(0, praiseMessages.length - 1)];
+        msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + username).replace('{text}', text);
+        await sendMessage(this.app, modify, this.app.kokoPostPraiseRoom, msg);
+    }
+
+    /**
      * Saves the selected username in persistence storage and asks for a praise reason
      * @param username selected username
      * @param association where to save the username
@@ -251,30 +268,5 @@ export class KokoPraise {
 
         // Asks for a praise reason
         await sendMessage(this.app, modify, room, txt);
-    }
-
-    /**
-     * Sends a praise message to kokoPostPraiseRoom
-     *
-     * @param username the username being praised
-     * @param text the motive for praising
-     * @param sender the user sending a praise
-     * @param read IRead
-     * @param modify IModify
-     */
-    private async sendPraise(modify: IModify, sender: IUser, username: string, text: string) {
-        let msg;
-        if (sender.username === username) {
-            msg = `@${sender.username} praises him- or herself for "${text}"`;
-        } else {
-            const praiseMessages = [
-                '@sender says thanks to @username for "{text}"',
-                '@sender gives @username kudos for "{text}"',
-                '@sender thinks @username did a good job on "{text}"',
-            ];
-            msg = praiseMessages[random(0, praiseMessages.length - 1)];
-            msg = msg.replace('@sender', '@' + sender.username).replace('@username', '@' + username).replace('{text}', text);
-        }
-        await sendMessage(this.app, modify, this.app.kokoPostPraiseRoom, msg);
     }
 }
