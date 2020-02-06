@@ -1,10 +1,11 @@
 import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
+
 import { KokoApp } from '../KokoApp';
+import { praiseModal } from '../modals/PraiseModal';
 
 // tslint:disable-next-line:max-line-length
 export async function processPraiseCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, params?: Array<string>): Promise<void> {
-    const sender = context.getSender();
     if (params && params.length > 0 && params[0].trim()) {
         const firstParam = params.shift() as string | boolean;
 
@@ -14,6 +15,13 @@ export async function processPraiseCommand(app: KokoApp, context: SlashCommandCo
         }
     }
 
-    // If command had no params, start a new praise with user choice
-    app.kokoPraise.run(read, modify, persistence, sender);
+    const triggerId = context.getTriggerId();
+    if (triggerId) {
+        try {
+            const modal = await praiseModal({ app, read, modify, data: { user: context.getSender() } });
+            await modify.getUiController().openModalView(modal, { triggerId }, context.getSender());
+        } catch (error) {
+            console.log(error);
+        }
+    }
 }

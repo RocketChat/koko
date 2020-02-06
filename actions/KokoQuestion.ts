@@ -1,16 +1,18 @@
 import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
+import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+import { Buffer } from 'buffer';
+
+import { createQuestionBlocks } from '../blocks/QuestionBlocks';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers, random, sendMessage } from '../lib/helpers';
+import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
 import { IAnswer, IAnswerStorage } from '../storage/IAnswerStorage';
-import { IListenStorage } from '../storage/IListenStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
 
 export class KokoQuestion {
-    // List of questions based on https://conversationstartersworld.com
+    // List of questions based on https://conversationstartersworld.com and https://reddit.com/r/askreddit
     private questions = [
         'Among your friends or family, what are you famous for?',
         'An app mysteriously appears on your phone that does something amazing. What does it do?',
@@ -223,6 +225,44 @@ export class KokoQuestion {
         'Would you rather not be able to open any closed doors (locked or unlocked) or not be able to close any open doors?',
         'Would you rather travel the world for a year on a shoe string budget or stay in only one country for a year but live in luxury?',
         'Would you want the ability to hear the thoughts of people near you if you couldn\'t turn the ability off?',
+        'You are sent back to the day the titanic set sail with nothing but a 3rd class ticket (and food water ect) your task is to stop the titanic from sinking, how do you do this?',
+        'What was your "How didn\'t they notice?" moment?',
+        'What phrases are you really sick of hearing?',
+        'You go on a first date with someone, what habit or characteristic is a deal breaker?',
+        'What are great questions to ask your interviewer at the end of a job interview?',
+        'You have one hour to eat 5,000 calories, what food do you choose?',
+        'If you could make one thing illegal, what would it be?',
+        'What is something you fear at night?',
+        'What\'s that dumb thing you did years ago that you can\'t stop thinking about?',
+        'What stereotype about your country is actually pretty accurate?',
+        'What turns you into a little kid?',
+        'What is generally more dangerous than people think?',
+        'What is a waste of money to you?',
+        'Which TV series eventually won you over, after refusing to give it a shot?',
+        'You are now a YouTuber with over 5 Million subscribers. What content are you posting?',
+        'What is your daily moment of peace?',
+        'What\'s a thing many people do but is actually pretty disrespectful ?',
+        'What feels like some money laundering scheme in the area where you live but can\'t prove it?',
+        'What silly thing did you worry about when you were a kid?',
+        'What is your favorite quote?',
+        'You can choose to live in any movie. Which one do you choose and why?',
+        'What is the worst thing humanity has created?',
+        'What song is stuck in your head?',
+        'Where is the best place to be during a zombie apocalypse?',
+        'What 1% are you a part of?',
+        'You are starting a revolution, why?',
+        'How was your day, yesterday?',
+        'What is the first thing you notice about a person?',
+        'If you could only take 3 things with you onto an abandoned island what would you take?',
+        'What is something someone told you that you\'ll never forget?',
+        'What is the weirdest dream you\'ve ever had?',
+        'In what ways would the world be different if religion never existed?',
+        'What\'s the best thing to say to the cops after you killed someone?',
+        'What\'s your nickname and why?',
+        'What do you want on your tombstone?',
+        'What is the worst thing you could whisper when hugging someone?',
+        'How to make time go by really fast?',
+        'What are some odd food combinations you really like?',
     ];
 
     constructor(private readonly app: KokoApp) {}
@@ -237,40 +277,104 @@ export class KokoQuestion {
                 // Posts previous answers as soon as new questions are being sent
                 await this.postAnswers(read, modify, persistence);
 
-                // Deletes previous answers
-                const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
-                await persistence.removeByAssociation(assocAnswer);
-
                 // Saves a random question in storage
-                const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
+                let answers = {};
                 const question = this.questions[random(0, this.questions.length - 1)];
-                const questionStorage: IQuestionStorage = { question };
-                await persistence.updateByAssociation(assocQuestion, questionStorage, true);
+                const encodedQuestion = Buffer.from(question).toString('base64') as string;
 
-                // Sends the same question to each member
+                const assocQuestions = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
+                const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestions);
+                if (awaitData && awaitData[0]) {
+                    const questionData = awaitData[0] as IQuestionStorage;
+                    answers = questionData.answers || {};
+                    if (questionData.answers && !questionData.answers[encodedQuestion]) {
+                        answers[encodedQuestion] = [];
+                    }
+                }
+
+                const questionStorage: IQuestionStorage = { question, answers };
+                await persistence.updateByAssociation(assocQuestions, questionStorage, true);
+
+                // Sends message to each member
                 for (const member of members) {
-
-                    // Saves new association record for listening for the answer
-                    const assocListen = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, member.id);
-                    const listenStorage: IListenStorage = { listen: 'answer' };
-                    await persistence.updateByAssociation(assocListen, listenStorage, true);
+                    if (member.id === this.app.botUser.id) {
+                        continue;
+                    }
 
                     // Gets or creates a direct message room between botUser and member
                     const room = await getDirect(this.app, read, modify, member.username) as IRoom;
-                    const attachment = {
-                        actions: [
-                            {
-                                type: MessageActionType.BUTTON,
-                                msg: `/koko question`,
-                                msg_in_chat_window: true,
-                                text: 'Repeat question',
-                            },
-                        ],
-                    };
-                    await sendMessage(this.app, modify, room, question, [attachment]);
+
+                    // Creates praise blocks
+                    const blocks = createQuestionBlocks(modify, question);
+                    await sendMessage(this.app, modify, room, '', [], blocks);
                 }
             }
         }
+    }
+
+    /**
+     * Checks if usernames have been selected and reason is given
+     * Then sends a praise to the selected users
+     */
+    // tslint:disable-next-line:max-line-length
+    public async submit({ context, modify, read, persistence }: { context: UIKitViewSubmitInteractionContext, modify: IModify, read: IRead, persistence: IPersistence }) {
+        const data = context.getInteractionData();
+        const { question }: {
+            question: {
+                answer: string,
+            },
+        } = data.view.state as any;
+        const errors = {} as any;
+        if (question === undefined || question.answer === undefined || question.answer.length === 0) {
+            errors.answer = 'Please type your answer';
+        }
+        if (Object.keys(errors).length > 0) {
+            return context.getInteractionResponder().viewErrorResponse({
+                viewId: data.view.id,
+                errors,
+            });
+        }
+
+        const assocQuestions = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
+        const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestions);
+        if (awaitData && awaitData[0]) {
+            const questionData = awaitData[0] as IQuestionStorage;
+            const lastQuestion = questionData.question;
+            const encodedQuestion = Buffer.from(lastQuestion).toString('base64') as string;
+
+            if (questionData.answers[encodedQuestion] === undefined) {
+                questionData.answers[encodedQuestion] = [];
+            }
+
+            let update = false;
+            for (const index in questionData.answers[encodedQuestion]) {
+                if (questionData.answers[encodedQuestion].hasOwnProperty(index)) {
+                    const answer = questionData.answers[encodedQuestion][index];
+                    if (answer.username === data.user.username) {
+                        update = true;
+                        questionData.answers[encodedQuestion][index].answer = question.answer;
+                    }
+                }
+            }
+            if (!update) {
+                questionData.answers[encodedQuestion].push({
+                    username: data.user.username,
+                    answer: question.answer,
+                });
+            }
+
+            const questionStorage: IQuestionStorage = { question: lastQuestion, answers: questionData.answers };
+            await persistence.updateByAssociation(assocQuestions, questionStorage, true);
+        }
+
+        // Notifies user that his answer is saved
+        const room = await getDirect(this.app, read, modify, data.user.username) as IRoom;
+        const msg = `Your answer has been registered.`;
+        await notifyUser(this.app, modify, room, data.user, msg);
+
+        return {
+            success: true,
+        };
     }
 
     /**
@@ -321,25 +425,6 @@ export class KokoQuestion {
     }
 
     /**
-     * Repeats last question for the selected user
-     */
-    public async repeatQuestion(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser) {
-        const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
-        const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
-        if (awaitData && awaitData[0]) {
-            const question = awaitData[0] as IQuestionStorage;
-
-            // Saves association record for listening for the answer
-            const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
-            const data: IListenStorage = { listen: 'answer' };
-            await persistence.updateByAssociation(association, data, true);
-
-            const room = await getDirect(this.app, read, modify, sender.username) as IRoom;
-            await sendMessage(this.app, modify, room, question.question);
-        }
-    }
-
-    /**
      * Posts all answer for the previous question
      *
      * @param read
@@ -348,28 +433,21 @@ export class KokoQuestion {
      */
     public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence) {
         if (this.app.kokoPostAnswersRoom) {
-            const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'question');
+            const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
             const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
             if (awaitData && awaitData[0]) {
                 const question = awaitData[0] as IQuestionStorage;
+                const encodedQuestion = Buffer.from(question.question).toString('base64') as string;
 
                 // Start building the message that will be sent to answers channel
                 let text = `*${question.question}*\n\n`;
-                const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
-                const answersData = await read.getPersistenceReader().readByAssociation(assocAnswer);
-                if (answersData && answersData.length > 0) {
-                    const answers = answersData[0] as IAnswerStorage;
-                    answers.forEach((answer: IAnswer) => {
-                        text += `*${answer.username}*: ${answer.answer}\n`;
-                    });
+                const answers = question.answers[encodedQuestion];
+                answers.forEach((answer: IAnswer) => {
+                    text += `*${answer.username}*: ${answer.answer}\n`;
+                });
 
                     // Message is built, send
-                    await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
-                }
-
-                // Remove question and answers from storage
-                await persistence.removeByAssociation(assocQuestion);
-                await persistence.removeByAssociation(assocAnswer);
+                await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
             }
         }
     }

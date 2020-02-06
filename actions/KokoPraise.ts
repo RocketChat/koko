@@ -153,7 +153,10 @@ export class KokoPraise {
                 errors,
             });
         }
-        return await this.sendPraise(read, modify, persistence, data.user, praise.who, praise.why);
+        await this.sendPraise(read, modify, persistence, data.user, praise.who, praise.why);
+        return {
+            success: true,
+        };
     }
 
     /**

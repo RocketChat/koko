@@ -30,6 +30,7 @@ import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
 import { MembersCache } from './MembersCache';
 import { praiseModal } from './modals/PraiseModal';
+import { questionModal } from './modals/QuestionModal';
 import { settings } from './settings';
 
 export class KokoApp extends App implements IUIKitInteractionHandler {
@@ -118,8 +119,9 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         const data = context.getInteractionData();
         switch (data.view.id) {
             case 'praise':
-                this.kokoPraise.submit({ context, modify, read, persistence });
-                break;
+                return this.kokoPraise.submit({ context, modify, read, persistence });
+            case 'question':
+                return this.kokoQuestion.submit({ context, modify, read, persistence });
         }
         return {
             success: true,
@@ -134,6 +136,10 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         switch (data.actionId) {
             case 'praise': {
                 const modal = await praiseModal({ app: this, data, read, modify });
+                return context.getInteractionResponder().openModalViewResponse(modal);
+            }
+            case 'question': {
+                const modal = await questionModal({ read, modify, data });
                 return context.getInteractionResponder().openModalViewResponse(modal);
             }
         }
