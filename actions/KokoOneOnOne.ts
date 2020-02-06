@@ -85,12 +85,6 @@ export class KokoOneOnOne {
                         msg_in_chat_window: true,
                         msg: '/koko one-on-one',
                     },
-                    // {
-                    //     text: 'No',
-                    //     type: MessageActionType.BUTTON,
-                    //     msg_in_chat_window: true,
-                    //     msg: '/koko one-on-one cancel',
-                    // },
                 ],
             };
 

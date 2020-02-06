@@ -48,6 +48,38 @@ export async function questionModal({ read, modify, data }: {
                 emoji: true,
             },
         });
+        block.addInputBlock({
+            blockId: 'question',
+            element: block.newStaticSelectElement({
+                actionId: 'anonymous',
+                initialValue: [ 'no' ],
+                placeholder: {
+                    type: TextObjectType.PLAINTEXT,
+                    text: 'Yes/No',
+                },
+                options: [
+                    {
+                        text: {
+                            type: TextObjectType.PLAINTEXT,
+                            text: 'Yes',
+                        },
+                        value: 'yes',
+                    },
+                    {
+                        text: {
+                            type: TextObjectType.PLAINTEXT,
+                            text: 'No',
+                        },
+                        value: 'no',
+                    },
+                ],
+            }),
+            label: {
+                type: TextObjectType.PLAINTEXT,
+                text: 'Anonymous?',
+                emoji: true,
+            },
+        });
     }
 
     return {

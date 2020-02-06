@@ -322,6 +322,7 @@ export class KokoQuestion {
         const { question }: {
             question: {
                 answer: string,
+                anonymous: string,
             },
         } = data.view.state as any;
         const errors = {} as any;
@@ -347,18 +348,20 @@ export class KokoQuestion {
             }
 
             let update = false;
-            for (const index in questionData.answers[encodedQuestion]) {
-                if (questionData.answers[encodedQuestion].hasOwnProperty(index)) {
-                    const answer = questionData.answers[encodedQuestion][index];
-                    if (answer.username === data.user.username) {
-                        update = true;
-                        questionData.answers[encodedQuestion][index].answer = question.answer;
+            if (question && question.anonymous !== 'yes') {
+                for (const index in questionData.answers[encodedQuestion]) {
+                    if (questionData.answers[encodedQuestion].hasOwnProperty(index)) {
+                        const answer = questionData.answers[encodedQuestion][index];
+                        if (answer.username === data.user.username) {
+                            update = true;
+                            questionData.answers[encodedQuestion][index].answer = question.answer;
+                        }
                     }
                 }
             }
             if (!update) {
                 questionData.answers[encodedQuestion].push({
-                    username: data.user.username,
+                    username: question && question.anonymous !== 'yes' ? data.user.username : 'Anonymous',
                     answer: question.answer,
                 });
             }
