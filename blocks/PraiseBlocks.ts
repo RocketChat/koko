@@ -5,7 +5,7 @@ export function createPraiseBlocks(modify: IModify, text: string): BlockBuilder 
     const blocks = modify.getCreator().getBlockBuilder();
     blocks.addSectionBlock({
         text: {
-            type: TextObjectType.PLAINTEXT,
+            type: TextObjectType.MARKDOWN,
             text,
         },
     });
