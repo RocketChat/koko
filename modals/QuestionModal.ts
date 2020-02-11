@@ -52,7 +52,7 @@ export async function questionModal({ read, modify, data }: {
             blockId: 'question',
             element: block.newStaticSelectElement({
                 actionId: 'anonymous',
-                initialValue: [ 'no' ],
+                initialValue: 'no',
                 placeholder: {
                     type: TextObjectType.PLAINTEXT,
                     text: 'Yes/No',
@@ -95,6 +95,38 @@ export async function questionModal({ read, modify, data }: {
             },
         }),
         close: block.newButtonElement({
+            text: {
+                type: TextObjectType.PLAINTEXT,
+                text: 'Dismiss',
+            },
+        }),
+        blocks: block.getBlocks(),
+    };
+}
+
+export async function answerRegisteredModal({ read, modify, data }: {
+    read: IRead,
+    modify: IModify,
+    data,
+}): Promise<IUIKitModalViewParam> {
+    const viewId = 'answerRegistered';
+    const block = modify.getCreator().getBlockBuilder();
+
+    block.addSectionBlock({
+        text: {
+            type: TextObjectType.PLAINTEXT,
+            text: 'Your answer has been registered.',
+        },
+    });
+
+    return {
+        id: viewId,
+        title: {
+            type: TextObjectType.PLAINTEXT,
+            text: 'Thank you',
+        },
+        close: block.newButtonElement({
+            actionId: 'dismissAnswerRegistered',
             text: {
                 type: TextObjectType.PLAINTEXT,
                 text: 'Dismiss',

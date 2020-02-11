@@ -8,6 +8,7 @@ import { Buffer } from 'buffer';
 import { createQuestionBlocks } from '../blocks/QuestionBlocks';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
+import { answerRegisteredModal } from '../modals/QuestionModal';
 import { IAnswer, IAnswerStorage } from '../storage/IAnswerStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
 
@@ -368,12 +369,15 @@ export class KokoQuestion {
 
             const questionStorage: IQuestionStorage = { question: lastQuestion, answers: questionData.answers };
             await persistence.updateByAssociation(assocQuestions, questionStorage, true);
-        }
 
-        // Notifies user that his answer is saved
-        const room = await getDirect(this.app, read, modify, data.user.username) as IRoom;
-        const msg = `Your answer has been registered.`;
-        await notifyUser(this.app, modify, room, data.user, msg);
+            // // Notifies user that his answer is saved
+            // const room = await getDirect(this.app, read, modify, data.user.username) as IRoom;
+            // const msg = `Your answer has been registered.`;
+            // await notifyUser(this.app, modify, room, data.user, msg);
+
+            const modal = await answerRegisteredModal({ read, modify, data });
+            return context.getInteractionResponder().openModalViewResponse(modal);
+        }
 
         return {
             success: true,
