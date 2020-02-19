@@ -8,6 +8,7 @@ import { Buffer } from 'buffer';
 import { createPraiseBlocks } from '../blocks/PraiseBlocks';
 import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
+import { praiseRegisteredModal } from '../modals/PraiseModal';
 import { IKarmaStorage, IPraiserKarmaStorage } from '../storage/IKarmaStorage';
 
 export class KokoPraise {
@@ -53,7 +54,7 @@ export class KokoPraise {
 
                 // Creates praise blocks
                 const blocks = createPraiseBlocks(modify, text);
-                await sendMessage(this.app, modify, room, '', [], blocks);
+                await sendMessage(this.app, modify, room, text, [], blocks);
             }
         }
         return;
@@ -154,6 +155,8 @@ export class KokoPraise {
             });
         }
         await this.sendPraise(read, modify, persistence, data.user, praise.who, praise.why);
+        const modal = await praiseRegisteredModal({ read, modify, data });
+        return context.getInteractionResponder().updateModalViewResponse(modal);
         return {
             success: true,
         };

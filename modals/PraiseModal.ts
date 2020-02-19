@@ -82,3 +82,34 @@ export async function praiseModal({ app, data, read, modify }: {
         blocks: block.getBlocks(),
     };
 }
+
+export async function praiseRegisteredModal({ read, modify, data }: {
+    read: IRead,
+    modify: IModify,
+    data,
+}): Promise<IUIKitModalViewParam> {
+    const viewId = 'praise';
+    const block = modify.getCreator().getBlockBuilder();
+
+    block.addSectionBlock({
+        text: {
+            type: TextObjectType.PLAINTEXT,
+            text: 'Your praise has been registered.',
+        },
+    });
+
+    return {
+        id: viewId,
+        title: {
+            type: TextObjectType.PLAINTEXT,
+            text: 'Thank you',
+        },
+        close: block.newButtonElement({
+            text: {
+                type: TextObjectType.PLAINTEXT,
+                text: 'Dismiss',
+            },
+        }),
+        blocks: block.getBlocks(),
+    };
+}

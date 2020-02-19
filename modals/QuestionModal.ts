@@ -109,7 +109,7 @@ export async function answerRegisteredModal({ read, modify, data }: {
     modify: IModify,
     data,
 }): Promise<IUIKitModalViewParam> {
-    const viewId = 'answerRegistered';
+    const viewId = 'question';
     const block = modify.getCreator().getBlockBuilder();
 
     block.addSectionBlock({
@@ -126,7 +126,6 @@ export async function answerRegisteredModal({ read, modify, data }: {
             text: 'Thank you',
         },
         close: block.newButtonElement({
-            actionId: 'dismissAnswerRegistered',
             text: {
                 type: TextObjectType.PLAINTEXT,
                 text: 'Dismiss',

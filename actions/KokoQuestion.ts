@@ -307,7 +307,7 @@ export class KokoQuestion {
 
                     // Creates praise blocks
                     const blocks = createQuestionBlocks(modify, question);
-                    await sendMessage(this.app, modify, room, '', [], blocks);
+                    await sendMessage(this.app, modify, room, question, [], blocks);
                 }
             }
         }
@@ -376,7 +376,7 @@ export class KokoQuestion {
             // await notifyUser(this.app, modify, room, data.user, msg);
 
             const modal = await answerRegisteredModal({ read, modify, data });
-            return context.getInteractionResponder().openModalViewResponse(modal);
+            return context.getInteractionResponder().updateModalViewResponse(modal);
         }
 
         return {
