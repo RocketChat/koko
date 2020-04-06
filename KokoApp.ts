@@ -24,16 +24,19 @@ import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
+import { KokoWelness } from './actions/KokoWelness';
 import { KokoCommand } from './commands/KokoCommand';
 import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
+import { WelnessEndpoint } from './endpoints/WelnessEndpoint';
 import { MembersCache } from './MembersCache';
 import { praiseModal } from './modals/PraiseModal';
 import { questionModal } from './modals/QuestionModal';
 import { settings } from './settings';
+import { IPostMessageUpdated, IMessage } from '@rocket.chat/apps-engine/definition/messages';
 
-export class KokoApp extends App implements IUIKitInteractionHandler {
+export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageUpdated {
     /**
      * The bot username alias
      */
@@ -100,6 +103,11 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     public readonly kokoOneOnOne: KokoOneOnOne;
 
     /**
+     * The welness mechanism
+     */
+    public readonly kokoWelness: KokoWelness;
+
+    /**
      * Members cache
      */
     // tslint:disable-next-line:variable-name
@@ -110,6 +118,16 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoPraise = new KokoPraise(this);
         this.kokoQuestion = new KokoQuestion(this);
         this.kokoOneOnOne = new KokoOneOnOne(this);
+        this.kokoWelness = new KokoWelness(this);
+    }
+
+    public async checkPostMessageUpdated(message: IMessage, read: IRead, http: IHttp): Promise<boolean> {
+        console.log('check', message);
+        return true;
+    }
+
+    public async executePostMessageUpdated(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
+        console.log('POST', message);
     }
 
     /**
@@ -240,6 +258,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 new PraiseEndpoint(this),
                 new QuestionEndpoint(this),
                 new OneOnOneEndpoint(this),
+                new WelnessEndpoint(this),
             ],
         });
 
