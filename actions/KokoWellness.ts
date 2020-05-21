@@ -4,7 +4,7 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { KokoApp } from '../KokoApp';
 import { sendMessage } from '../lib/helpers';
 
-export class KokoWelness {
+export class KokoWellness {
     constructor(private readonly app: KokoApp) { }
 
     /**
@@ -18,15 +18,14 @@ export class KokoWelness {
     public async run(read: IRead, modify: IModify, persistence: IPersistence) {
         if (this.app.kokoPostAnswersRoom !== undefined) {
             let text;
-            const welnessAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'welness');
-            const [record] = await read.getPersistenceReader().readByAssociation(welnessAssociation);
+            const wellnessAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'wellness');
+            const [record] = await read.getPersistenceReader().readByAssociation(wellnessAssociation);
             if (!record) {
-                persistence.updateByAssociation(welnessAssociation, { firs: true });
-                text = `@all To make us feel a little closer together we're creating a daily point of contact around here to start our days! A simple check-in everyday to know how everyone is feeling, so let's begin?\n\nPlease react to this message with an emoji that represents how you are feeling today!`;
+                await persistence.updateByAssociation(wellnessAssociation, { first: true });
+                text = `To make us feel a little closer together we're creating a daily point of contact around here to start our days! A simple check-in everyday to know how everyone is feeling, so let's begin?\n\nPlease react to this message with an emoji that represents how you are feeling today!`;
             } else {
-                text = `@all *Check-in* - Please react to this message with an emoji that represents how you are feeling today!`;
+                text = `*Check-in* - Please react to this message with an emoji that represents how you are feeling today!`;
             }
-
             await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
         }
     }

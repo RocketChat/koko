@@ -24,19 +24,18 @@ import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
-import { KokoWelness } from './actions/KokoWelness';
+import { KokoWellness } from './actions/KokoWellness';
 import { KokoCommand } from './commands/KokoCommand';
 import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
-import { WelnessEndpoint } from './endpoints/WelnessEndpoint';
+import { WellnessEndpoint } from './endpoints/WellnessEndpoint';
 import { MembersCache } from './MembersCache';
 import { praiseModal } from './modals/PraiseModal';
 import { questionModal } from './modals/QuestionModal';
 import { settings } from './settings';
-import { IPostMessageUpdated, IMessage } from '@rocket.chat/apps-engine/definition/messages';
 
-export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageUpdated {
+export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
      * The bot username alias
      */
@@ -103,9 +102,9 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
     public readonly kokoOneOnOne: KokoOneOnOne;
 
     /**
-     * The welness mechanism
+     * The wellness mechanism
      */
-    public readonly kokoWelness: KokoWelness;
+    public readonly kokoWellness: KokoWellness;
 
     /**
      * Members cache
@@ -118,16 +117,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
         this.kokoPraise = new KokoPraise(this);
         this.kokoQuestion = new KokoQuestion(this);
         this.kokoOneOnOne = new KokoOneOnOne(this);
-        this.kokoWelness = new KokoWelness(this);
-    }
-
-    public async checkPostMessageUpdated(message: IMessage, read: IRead, http: IHttp): Promise<boolean> {
-        console.log('check', message);
-        return true;
-    }
-
-    public async executePostMessageUpdated(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
-        console.log('POST', message);
+        this.kokoWellness = new KokoWellness(this);
     }
 
     /**
@@ -258,7 +248,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
                 new PraiseEndpoint(this),
                 new QuestionEndpoint(this),
                 new OneOnOneEndpoint(this),
-                new WelnessEndpoint(this),
+                new WellnessEndpoint(this),
             ],
         });
 
