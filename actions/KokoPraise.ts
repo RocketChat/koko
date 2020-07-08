@@ -157,9 +157,6 @@ export class KokoPraise {
         await this.sendPraise(read, modify, persistence, data.user, praise.who, praise.why);
         const modal = await praiseRegisteredModal({ read, modify, data });
         return context.getInteractionResponder().updateModalViewResponse(modal);
-        return {
-            success: true,
-        };
     }
 
     /**

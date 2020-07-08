@@ -24,15 +24,19 @@ import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
+import { KokoValues } from './actions/KokoValues';
 import { KokoWellness } from './actions/KokoWellness';
 import { KokoCommand } from './commands/KokoCommand';
 import { OneOnOneEndpoint } from './endpoints/OneOnOneEndpoint';
 import { PraiseEndpoint } from './endpoints/PraiseEndpoint';
 import { QuestionEndpoint } from './endpoints/QuestionEndpoint';
+import { ValuesEndpoint } from './endpoints/ValuesEndpoint';
 import { WellnessEndpoint } from './endpoints/WellnessEndpoint';
 import { MembersCache } from './MembersCache';
+import { learnMoreModal } from './modals/LearnMoreModal';
 import { praiseModal } from './modals/PraiseModal';
 import { questionModal } from './modals/QuestionModal';
+import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 
 export class KokoApp extends App implements IUIKitInteractionHandler {
@@ -97,6 +101,11 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     public readonly kokoQuestion: KokoQuestion;
 
     /**
+     * The values mechanism
+     */
+    public readonly kokoValues: KokoValues;
+
+    /**
      * The random one on one mechanism
      */
     public readonly kokoOneOnOne: KokoOneOnOne;
@@ -118,6 +127,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoQuestion = new KokoQuestion(this);
         this.kokoOneOnOne = new KokoOneOnOne(this);
         this.kokoWellness = new KokoWellness(this);
+        this.kokoValues = new KokoValues(this);
     }
 
     /**
@@ -130,6 +140,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 return this.kokoPraise.submit({ context, modify, read, persistence });
             case 'question':
                 return this.kokoQuestion.submit({ context, modify, read, persistence });
+            case 'values':
+                return this.kokoValues.submit({ context, modify, read, persistence });
         }
         return {
             success: true,
@@ -148,6 +160,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
             }
             case 'question': {
                 const modal = await questionModal({ read, modify, data });
+                return context.getInteractionResponder().openModalViewResponse(modal);
+            }
+            case 'values': {
+                const modal = await valuesModal({ app: this, read, modify });
+                return context.getInteractionResponder().openModalViewResponse(modal);
+            }
+            case 'learnMore': {
+                const modal = await learnMoreModal({ app: this, read, modify, data });
                 return context.getInteractionResponder().openModalViewResponse(modal);
             }
         }
@@ -249,6 +269,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 new QuestionEndpoint(this),
                 new OneOnOneEndpoint(this),
                 new WellnessEndpoint(this),
+                new ValuesEndpoint(this),
             ],
         });
 
