@@ -1,5 +1,5 @@
 {
-    "Koko_Params": "praise, question, 1:1, cancel, help",
+    "Koko_Params": "praise, question, 1:1, cancel, help, suggest-rooms, register-room, remove-room",
     "Koko_Description": "Interacts with Koko. Type `/koko help` for more info",
     "Koko_Bot_Username": "Bot Username",
     "Koko_Bot_Username_Description": "The username who'll send the messages",

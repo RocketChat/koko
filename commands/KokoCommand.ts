@@ -8,6 +8,9 @@ import { processHelpCommand } from './Help';
 import { processOneOnOneCommand } from './OneOnOne';
 import { processPraiseCommand } from './Praise';
 import { processQuestionCommand } from './Question';
+import { proccessRegisterSuggestedRoomCommand } from './RegisterRoom';
+import { proccessSuggestRoomsCommand } from './SuggestRooms';
+import { proccessRemoveRoomsCommand } from './RemoveRoom';
 
 export class KokoCommand implements ISlashCommand {
     public command = 'koko';
@@ -23,11 +26,13 @@ export class KokoCommand implements ISlashCommand {
         OneOnOne: 'one-on-one',
         OneOnOneNumeral: '1:1',
         Send: 'send',
+        RegisterRoom: 'register-room',
+        SuggestRooms: 'suggest-rooms',
+        RemoveRoom: 'remove-room',
     };
 
     constructor(private readonly app: KokoApp) { }
     public async executor(context: SlashCommandContext, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<void> {
-
         // Gets room members (removes rocket.cat and koko bot)
         const members = await getMembers(this.app, read);
         const sender = context.getSender();
@@ -55,6 +60,15 @@ export class KokoCommand implements ISlashCommand {
                 break;
             case this.CommandEnum.Cancel:
                 await processCancelCommand(this.app, context, read, modify, persistence);
+                break;
+            case this.CommandEnum.SuggestRooms:
+                await proccessSuggestRoomsCommand(this.app, context, read, modify);
+                break;
+            case this.CommandEnum.RegisterRoom:
+                await proccessRegisterSuggestedRoomCommand(this.app, context, read, modify, persistence, params);
+                break;
+            case this.CommandEnum.RemoveRoom:
+                await proccessRemoveRoomsCommand(this.app, context, read, modify);
                 break;
             default:
                 await processHelpCommand(this.app, context, read, modify);

@@ -4,7 +4,7 @@ import {
     IConfigurationModify,
     IEnvironmentRead,
     IHttp,
-    ILogger,
+ILogger,
     IModify,
     IPersistence,
     IRead,
@@ -20,7 +20,10 @@ import {
     UIKitViewSubmitInteractionContext,
 } from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
+import { IRoomUserJoinedContext, IPostRoomUserJoined } from '@rocket.chat/apps-engine/definition/rooms';
+import { IPostMessageSent, IMessage } from '@rocket.chat/apps-engine/definition/messages';
 
+import { KokoSuggestRooms } from './actions/KokoSuggestRooms';
 import { KokoOneOnOne } from './actions/KokoOneOnOne';
 import { KokoPraise } from './actions/KokoPraise';
 import { KokoQuestion } from './actions/KokoQuestion';
@@ -39,7 +42,7 @@ import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 
-export class KokoApp extends App implements IUIKitInteractionHandler {
+export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
     /**
      * The bot username alias
      */
@@ -116,10 +119,17 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     public readonly kokoWellness: KokoWellness;
 
     /**
+     * The room suggestion mechanism
+     */
+    public readonly kokoSuggestRooms: KokoSuggestRooms;
+
+    /**
      * Members cache
      */
     // tslint:disable-next-line:variable-name
     private _membersCache: MembersCache;
+
+    private _modify: IModify;
 
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
@@ -128,6 +138,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoOneOnOne = new KokoOneOnOne(this);
         this.kokoWellness = new KokoWellness(this);
         this.kokoValues = new KokoValues(this);
+        this.kokoSuggestRooms = new KokoSuggestRooms(this);
     }
 
     /**
@@ -142,6 +153,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 return this.kokoQuestion.submit({ context, modify, read, persistence });
             case 'values':
                 return this.kokoValues.submit({ context, modify, read, persistence });
+            case 'remove-rooms':
+                return this.kokoSuggestRooms.removeRoomSubmit({ context, modify, read, persistence });
         }
         return {
             success: true,
@@ -276,6 +289,30 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         // Slash Commands
         await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
     }
+
+
+     /**
+     * Save modify dependency in the app, so it can be used on events that don't receive it
+     */
+    public async executePostMessageSent(message: IMessage, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify): Promise<void> {
+        if (!this._modify) {
+            this._modify = modify;
+        }
+    }
+
+    /**
+     * Sends suggested rooms to user
+     */
+    // public async executePostRoomUserJoined(context: IRoomUserJoinedContext, read: IRead, http: IHttp, persistence: IPersistence): Promise<void> {
+    //     // if it's not the members room, ignore
+    //     console.log('executePostRoomUserJoined', this.kokoMembersRoomName, context.room.slugifiedName)
+    //     if (this.kokoMembersRoomName !== context.room.slugifiedName) {
+    //         return;
+    //     }
+
+    //     // Send suggested rooms to new member
+    //     return this.kokoSuggestRooms.suggestRooms(context.joiningUser, read, this._modify, context.room, context.getTriggerId());
+    // }
 
     get membersCache(): MembersCache {
         return this._membersCache;
