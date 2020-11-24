@@ -14,7 +14,11 @@ export async function processHelpCommand(app: KokoApp, context: SlashCommandCont
         \`/koko 1:1 (or one-on-one)\` Adds user to the random one-on-one waiting list
         \---
         \`/koko cancel\` Cancels all operations with current user
-        \`/koko help\` Shows this message`;
+        \`/koko help\` Shows this message
+        \---
+        \`/koko suggest-rooms\` Displays a list of suggested rooms you might be intersted in.
+        \`/koko register-room <name> <inviteLink>\` Registers a new suggested room.
+        \`/koko remove-room\` Prompts rooms to be removed.`;
 
     await sendMessage(app, modify, room, message);
 }
