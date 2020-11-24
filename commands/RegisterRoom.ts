@@ -32,5 +32,9 @@ export async function proccessRegisterSuggestedRoomCommand(app: KokoApp, context
         suggested = { rooms: [suggestedRoom] };
     }
 
-    app.kokoSuggestRooms.setRooms(persistence, suggested);
+    const result = await app.kokoSuggestRooms.setRooms(persistence, suggested);
+    if (result) {
+        return notifyUser(app, modify, context.getRoom(), context.getSender(), `Room \`${name}\` with invite link \`${inviteLink}\` registered!`);
+    }
+    return notifyUser(app, modify, context.getRoom(), context.getSender(), 'An error happened while registering the room.');
 }

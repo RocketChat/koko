@@ -14,6 +14,7 @@
     "description": "Rocket.Chat Koko Bot",
     "implements": [
         "IUIKitInteractionHandler",
-        "IPostMessageSent"
+        "IPostMessageSent",
+        "IPostRoomUserJoined"
     ]
 }

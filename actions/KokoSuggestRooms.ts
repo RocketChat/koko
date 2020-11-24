@@ -3,12 +3,13 @@ import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { KokoApp } from '../KokoApp';
-import { notifyUser } from '../lib/helpers';
+import { getDirect, notifyUser, sendMessage } from '../lib/helpers';
 import { ISuggestedRoomsStorage, SuggestedRoomsAssociationID,  } from '../storage/ISuggestedRoomStorage';
 import { suggestedRoomsModal } from '../modals/SuggestedRoomsModal';
 import { failedToRemoveRoomModal, successRemovingRoomsModal, removeRoomsModal } from '../modals/RemoveRoomsModal';
 import { IUIKitInteractionParam } from '@rocket.chat/apps-engine/definition/accessors/IUIController';
 import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
+import { MessageActionType } from '@rocket.chat/apps-engine/definition/messages';
 
 export class KokoSuggestRooms {
     constructor(private readonly app: KokoApp) { }
@@ -55,6 +56,30 @@ export class KokoSuggestRooms {
 
         const modal = await suggestedRoomsModal({ suggestedRooms: suggestedRooms[0], modify });
         return modify.getUiController().openModalView(modal, interaction, user);
+    }
+
+    public async sendWelcomeMessage(user: IUser, read: IRead, modify: IModify) {
+        const suggestedRooms = await this.getRooms(read);
+
+        if (!this.hasRooms(suggestedRooms))  {
+            return;
+        }
+
+        const room = await getDirect(this.app, read, modify, user.username) as IRoom;
+
+        const message = 'Welcome to Rocket.Chat :rocket:! We have prepared a list of internal rooms you might wanna join:';
+        const attachment = {
+            actions: [
+                {
+                    type: MessageActionType.BUTTON,
+                    msg: `/koko suggest-rooms`,
+                    msg_in_chat_window: true,
+                    text: 'See Rooms',
+                },
+            ],
+        };
+        await sendMessage(this.app, modify, room, message, [attachment]);
+        return;
     }
 
     public async removeRoomPrompt(interaction: IUIKitInteractionParam, user: IUser, read: IRead, modify: IModify, room: IRoom) {

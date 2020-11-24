@@ -42,7 +42,7 @@ import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 
-export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
+export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent, IPostRoomUserJoined {
     /**
      * The bot username alias
      */
@@ -303,16 +303,15 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
     /**
      * Sends suggested rooms to user
      */
-    // public async executePostRoomUserJoined(context: IRoomUserJoinedContext, read: IRead, http: IHttp, persistence: IPersistence): Promise<void> {
-    //     // if it's not the members room, ignore
-    //     console.log('executePostRoomUserJoined', this.kokoMembersRoomName, context.room.slugifiedName)
-    //     if (this.kokoMembersRoomName !== context.room.slugifiedName) {
-    //         return;
-    //     }
+    public async executePostRoomUserJoined(context: IRoomUserJoinedContext, read: IRead, http: IHttp, persistence: IPersistence): Promise<void> {
+        // if it's not the members room, ignore
+        if (this.kokoMembersRoomName !== context.room.slugifiedName) {
+            return;
+        }
 
-    //     // Send suggested rooms to new member
-    //     return this.kokoSuggestRooms.suggestRooms(context.joiningUser, read, this._modify, context.room, context.getTriggerId());
-    // }
+        // Send suggested rooms to new member
+        await this.kokoSuggestRooms.sendWelcomeMessage(context.joiningUser, read, this._modify);
+    }
 
     get membersCache(): MembersCache {
         return this._membersCache;
