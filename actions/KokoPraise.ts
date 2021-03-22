@@ -23,7 +23,7 @@ export class KokoPraise {
      * @param user (optional) sends praise request to single user
      */
     // tslint:disable-next-line:max-line-length
-    public async run(read: IRead, modify: IModify, persistence: IPersistence, user?: IUser) {
+    public async run(read: IRead, modify: IModify, persistence: IPersistence, user?: IUser, praiseQuestion?: string, sendScoreBoard?: string) {
 
         // Gets room members (removes rocket.cat and koko bot)
         let members = await getMembers(this.app, read);
@@ -35,7 +35,7 @@ export class KokoPraise {
                 'I\'m sure someone did something good recently. How about saying thanks?',
                 'How about giving praise to someone today?',
             ];
-            const text = praiseQuestions[random(0, praiseQuestions.length - 1)];
+            const text = praiseQuestion ? praiseQuestion : praiseQuestions[random(0, praiseQuestions.length - 1)];
 
             // If slashcommand was used, overrides members with the sender
             // This way only this user will receive the praise request
@@ -56,6 +56,12 @@ export class KokoPraise {
                 const blocks = createPraiseBlocks(modify, text);
                 await sendMessage(this.app, modify, room, text, [], blocks);
             }
+
+            if (sendScoreBoard === 'praisers') {
+                await this.sendKarmaScoreboard({ read, modify, room: this.app.kokoPostPraiseRoom, praisees: false, praisers: true });
+            } else if (sendScoreBoard === 'all') {
+                await this.sendKarmaScoreboard({ read, modify, room: this.app.kokoPostPraiseRoom, praisees: true, praisers: true });
+            }
         }
         return;
     }
@@ -66,65 +72,84 @@ export class KokoPraise {
      * @param read
      * @param modify
      */
-    public async sendKarmaScoreboard(read: IRead, modify: IModify, room: IRoom, user: IUser) {
+    public async sendKarmaScoreboard({ read, modify, room, user, praisers, praisees }: { read: IRead, modify: IModify, room: IRoom, user?: IUser, praisers?: boolean, praisees?: boolean }) {
         let output = '';
 
-        const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
-        const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
-        if (karmaData && karmaData.length > 0 && karmaData[0]) {
-            const karma = karmaData[0] as IKarmaStorage;
-            const sortable = [] as any;
-            for (const key in karma) {
-                if (karma.hasOwnProperty(key)) {
-                    sortable.push([key, karma[key]]);
-                }
-            }
-            sortable.sort((a, b) => b[1] - a[1]);
-            output += '*Here is the current Karma Scoreboard*:\n';
-            const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
-            let count = -1;
-            let last;
-            for (const key in sortable) {
-                if (sortable.hasOwnProperty(key)) {
-                    if (last !== sortable[key][1]) {
-                        count++;
+        if (praisers !== false) {
+            const praiserKarmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'praiserKarma');
+            const praiserKarmaData = await read.getPersistenceReader().readByAssociation(praiserKarmaAssoc);
+            if (praiserKarmaData && praiserKarmaData.length > 0 && praiserKarmaData[0]) {
+                const praiserKarma = praiserKarmaData[0] as IPraiserKarmaStorage;
+                const praiserSortable = [] as any;
+                for (const key in praiserKarma) {
+                    if (praiserKarma.hasOwnProperty(key)) {
+                        praiserSortable.push([key, praiserKarma[key]]);
                     }
-                    const username = Buffer.from(sortable[key][0], 'base64').toString('utf8') as string;
-                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${sortable[key][1]}\n`;
-                    last = sortable[key][1];
+                }
+                praiserSortable.sort((a, b) => b[1] - a[1]);
+                output += '*These are the people who sent the most praises (top 10)*:\n';
+                const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
+                let countUsers = 0;
+                let count = -1;
+                let last;
+                for (const key in praiserSortable) {
+                    countUsers++;
+                    if (countUsers > 10) {
+                        break;
+                    }
+                    if (praiserSortable.hasOwnProperty(key)) {
+                        if (last !== praiserSortable[key][1]) {
+                            count++;
+                        }
+                        const username = Buffer.from(praiserSortable[key][0], 'base64').toString('utf8') as string;
+                        output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${praiserSortable[key][1]}\n`;
+                        last = praiserSortable[key][1];
+                    }
                 }
             }
         }
 
-        const praiserKarmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'praiserKarma');
-        const praiserKarmaData = await read.getPersistenceReader().readByAssociation(praiserKarmaAssoc);
-        if (praiserKarmaData && praiserKarmaData.length > 0 && praiserKarmaData[0]) {
-            const praiserKarma = praiserKarmaData[0] as IPraiserKarmaStorage;
-            const praiserSortable = [] as any;
-            for (const key in praiserKarma) {
-                if (praiserKarma.hasOwnProperty(key)) {
-                    praiserSortable.push([key, praiserKarma[key]]);
-                }
-            }
-            praiserSortable.sort((a, b) => b[1] - a[1]);
-            output += '\n*Here is the current Praiser Scoreboard*:\n';
-            const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
-            let count = -1;
-            let last;
-            for (const key in praiserSortable) {
-                if (praiserSortable.hasOwnProperty(key)) {
-                    if (last !== praiserSortable[key][1]) {
-                        count++;
+
+        if (praisees !== false) {
+            const karmaAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'karma');
+            const karmaData = await read.getPersistenceReader().readByAssociation(karmaAssoc);
+            if (karmaData && karmaData.length > 0 && karmaData[0]) {
+                const karma = karmaData[0] as IKarmaStorage;
+                const sortable = [] as any;
+                for (const key in karma) {
+                    if (karma.hasOwnProperty(key)) {
+                        sortable.push([key, karma[key]]);
                     }
-                    const username = Buffer.from(praiserSortable[key][0], 'base64').toString('utf8') as string;
-                    output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${praiserSortable[key][1]}\n`;
-                    last = praiserSortable[key][1];
+                }
+                sortable.sort((a, b) => b[1] - a[1]);
+                output += '\n*Here is the current Karma Scoreboard (top 10)*:\n';
+                const emojis = [':first_place: ', ':second_place: ', ':third_place: '];
+                let countUsers = 0;
+                let count = -1;
+                let last;
+                for (const key in sortable) {
+                    countUsers++;
+                    if (countUsers > 10) {
+                        break;
+                    }
+                    if (sortable.hasOwnProperty(key)) {
+                        if (last !== sortable[key][1]) {
+                            count++;
+                        }
+                        const username = Buffer.from(sortable[key][0], 'base64').toString('utf8') as string;
+                        output += `${emojis[count] ? emojis[count] : ':reminder_ribbon: '}${username}: ${sortable[key][1]}\n`;
+                        last = sortable[key][1];
+                    }
                 }
             }
         }
 
         if (output) {
-            await notifyUser(this.app, modify, room, user, output);
+            if (user) {
+                await notifyUser(this.app, modify, room, user, output);
+            } else {
+                await sendMessage(this.app, modify, room, output);
+            }
         }
     }
 

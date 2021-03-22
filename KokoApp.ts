@@ -13,6 +13,7 @@ import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IAppInfo } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
+import { StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
 import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
 import {
     IUIKitInteractionHandler,
@@ -225,25 +226,25 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
             case 'Members_Room_Name':
                 this.kokoMembersRoomName = setting.value;
                 if (this.kokoMembersRoomName) {
-                    this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
+                    this.kokoMembersRoom = await read.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
                 }
                 break;
             case 'Post_Praise_Room_Name':
                 this.kokoPostPraiseRoomName = setting.value;
                 if (this.kokoPostPraiseRoomName) {
-                    this.kokoPostPraiseRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
+                    this.kokoPostPraiseRoom = await read.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
                 }
                 break;
             case 'Post_Answers_Room_Name':
                 this.kokoPostAnswersRoomName = setting.value;
                 if (this.kokoPostAnswersRoomName) {
-                    this.kokoPostAnswersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
+                    this.kokoPostAnswersRoom = await read.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
                 }
                 break;
             case 'Bot_User':
                 this.botUsername = setting.value;
                 if (this.botUsername) {
-                    this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
+                    this.botUser = await read.getUserReader().getByUsername(this.botUsername) as IUser;
                 }
                 break;
         }
@@ -275,6 +276,65 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 
         // Slash Commands
         await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
+
+        // Scheduler
+        configuration.scheduler.registerProcessors([
+            {
+                id: 'praise',
+                startupSetting: {
+                    type: StartupType.RECURRING,
+                    interval: '15 14 * * 1',
+                    data: { appId: this.getID() },
+                },
+                processor: async (jobContext, read, modify, http, persistence) => {
+                    this.kokoPraise.run(read, modify, persistence);
+                },
+            },
+            {
+                id: 'question',
+                startupSetting: {
+                    type: StartupType.RECURRING,
+                    interval: '0 15 * * 1,4',
+                    data: { appId: this.getID() },
+                },
+                processor: async (jobContext, read, modify, http, persistence) => {
+                    this.kokoQuestion.run(read, modify, persistence);
+                },
+            },
+            {
+                id: 'one-on-one',
+                startupSetting: {
+                    type: StartupType.RECURRING,
+                    interval: '0 17 * * 2',
+                    data: { appId: this.getID() },
+                },
+                processor: async (jobContext, read, modify, http, persistence) => {
+                    this.kokoOneOnOne.run(read, modify, persistence);
+                },
+            },
+            {
+                id: 'welness',
+                startupSetting: {
+                    type: StartupType.RECURRING,
+                    interval: '0 13 * * 1,3,5',
+                    data: { appId: this.getID() },
+                },
+                processor: async (jobContext, read, modify, http, persistence) => {
+                    this.kokoWellness.run(read, modify, persistence);
+                },
+            },
+            {
+                id: 'values',
+                startupSetting: {
+                    type: StartupType.RECURRING,
+                    interval: '0 16 * * 5',
+                    data: { appId: this.getID() },
+                },
+                processor: async (jobContext, read, modify, http, persistence) => {
+                    this.kokoValues.run(read, modify, persistence);
+                },
+            },
+        ]);
     }
 
     get membersCache(): MembersCache {

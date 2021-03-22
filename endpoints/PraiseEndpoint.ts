@@ -12,7 +12,7 @@ export class PraiseEndpoint extends ApiEndpoint {
 
     // tslint:disable-next-line:max-line-length
     public async post(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        this.app.kokoPraise.run(read, modify, persistence);
+        this.app.kokoPraise.run(read, modify, persistence, undefined, request.query?.text, request.query?.sendScoreBoard);
         return this.success();
     }
 }

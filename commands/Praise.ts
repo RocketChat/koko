@@ -11,7 +11,7 @@ export async function processPraiseCommand(app: KokoApp, context: SlashCommandCo
 
         // If first param is 'score', send scoreboard
         if (firstParam === 'score') {
-            return await app.kokoPraise.sendKarmaScoreboard(read, modify, context.getRoom(), context.getSender());
+            return await app.kokoPraise.sendKarmaScoreboard({ read, modify, room: context.getRoom(), user: context.getSender(), praisees: true, praisers: true });
         }
     }
 
