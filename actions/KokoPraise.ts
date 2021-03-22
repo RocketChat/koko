@@ -12,6 +12,8 @@ import { praiseRegisteredModal } from '../modals/PraiseModal';
 import { IKarmaStorage, IPraiserKarmaStorage } from '../storage/IKarmaStorage';
 
 export class KokoPraise {
+    public sendScore = false;
+
     constructor(private readonly app: KokoApp) { }
 
     /**

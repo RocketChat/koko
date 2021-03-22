@@ -287,7 +287,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     data: { appId: this.getID() },
                 },
                 processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoPraise.run(read, modify, persistence);
+                    this.kokoPraise.run(read, modify, persistence, undefined, undefined, this.kokoPraise.sendScore ? 'praisers' : undefined);
+                    this.kokoPraise.sendScore = !this.kokoPraise.sendScore;
                 },
             },
             {
