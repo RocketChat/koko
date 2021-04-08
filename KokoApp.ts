@@ -189,26 +189,18 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoMembersRoomName = await environmentRead.getSettings().getValueById('Members_Room_Name');
         if (this.kokoMembersRoomName) {
             this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
-        } else {
-            return false;
         }
         this.kokoPostPraiseRoomName = await environmentRead.getSettings().getValueById('Post_Praise_Room_Name');
         if (this.kokoPostPraiseRoomName) {
             this.kokoPostPraiseRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
-        } else {
-            return false;
         }
         this.kokoPostAnswersRoomName = await environmentRead.getSettings().getValueById('Post_Answers_Room_Name');
         if (this.kokoPostAnswersRoomName) {
             this.kokoPostAnswersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
-        } else {
-            return false;
         }
         this.botUsername = await environmentRead.getSettings().getValueById('Bot_Username');
         if (this.botUsername) {
             this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
-        } else {
-            return false;
         }
         return true;
     }
