@@ -270,64 +270,64 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
 
         // Scheduler
-        configuration.scheduler.registerProcessors([
-            {
-                id: 'praise',
-                startupSetting: {
-                    type: StartupType.RECURRING,
-                    interval: '15 14 * * 1',
-                    data: { appId: this.getID() },
-                },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoPraise.run(read, modify, persistence, undefined, undefined, this.kokoPraise.sendScore ? 'praisers' : undefined);
-                    this.kokoPraise.sendScore = !this.kokoPraise.sendScore;
-                },
-            },
-            {
-                id: 'question',
-                startupSetting: {
-                    type: StartupType.RECURRING,
-                    interval: '0 15 * * 1,4',
-                    data: { appId: this.getID() },
-                },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoQuestion.run(read, modify, persistence);
-                },
-            },
-            {
-                id: 'one-on-one',
-                startupSetting: {
-                    type: StartupType.RECURRING,
-                    interval: '0 17 * * 2',
-                    data: { appId: this.getID() },
-                },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoOneOnOne.run(read, modify, persistence);
-                },
-            },
-            {
-                id: 'welness',
-                startupSetting: {
-                    type: StartupType.RECURRING,
-                    interval: '0 13 * * 1,3,5',
-                    data: { appId: this.getID() },
-                },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoWellness.run(read, modify, persistence);
-                },
-            },
-            {
-                id: 'values',
-                startupSetting: {
-                    type: StartupType.RECURRING,
-                    interval: '0 16 * * 5',
-                    data: { appId: this.getID() },
-                },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoValues.run(read, modify, persistence);
-                },
-            },
-        ]);
+        // configuration.scheduler.registerProcessors([
+        //     {
+        //         id: 'praise',
+        //         startupSetting: {
+        //             type: StartupType.RECURRING,
+        //             interval: '15 14 * * 1',
+        //             data: { appId: this.getID() },
+        //         },
+        //         processor: async (jobContext, read, modify, http, persistence) => {
+        //             this.kokoPraise.run(read, modify, persistence, undefined, undefined, this.kokoPraise.sendScore ? 'praisers' : undefined);
+        //             this.kokoPraise.sendScore = !this.kokoPraise.sendScore;
+        //         },
+        //     },
+        //     {
+        //         id: 'question',
+        //         startupSetting: {
+        //             type: StartupType.RECURRING,
+        //             interval: '0 15 * * 1,4',
+        //             data: { appId: this.getID() },
+        //         },
+        //         processor: async (jobContext, read, modify, http, persistence) => {
+        //             this.kokoQuestion.run(read, modify, persistence);
+        //         },
+        //     },
+        //     {
+        //         id: 'one-on-one',
+        //         startupSetting: {
+        //             type: StartupType.RECURRING,
+        //             interval: '0 17 * * 2',
+        //             data: { appId: this.getID() },
+        //         },
+        //         processor: async (jobContext, read, modify, http, persistence) => {
+        //             this.kokoOneOnOne.run(read, modify, persistence);
+        //         },
+        //     },
+        //     {
+        //         id: 'welness',
+        //         startupSetting: {
+        //             type: StartupType.RECURRING,
+        //             interval: '0 13 * * 1,3,5',
+        //             data: { appId: this.getID() },
+        //         },
+        //         processor: async (jobContext, read, modify, http, persistence) => {
+        //             this.kokoWellness.run(read, modify, persistence);
+        //         },
+        //     },
+        //     {
+        //         id: 'values',
+        //         startupSetting: {
+        //             type: StartupType.RECURRING,
+        //             interval: '0 16 * * 5',
+        //             data: { appId: this.getID() },
+        //         },
+        //         processor: async (jobContext, read, modify, http, persistence) => {
+        //             this.kokoValues.run(read, modify, persistence);
+        //         },
+        //     },
+        // ]);
     }
 
     get membersCache(): MembersCache {
