@@ -497,7 +497,7 @@ export class KokoQuestion {
 
                 // Start building the message that will be sent to answers channel
                 let text = `*${question.question}*\n\n`;
-                const answers = question.answers[encodedQuestion];
+                const answers = question.answers[encodedQuestion] || [];
                 answers.forEach((answer: IAnswer) => {
                     text += `*${answer.username}*: ${answer.answer}\n`;
                 });
