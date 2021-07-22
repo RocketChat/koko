@@ -372,7 +372,6 @@ export class KokoQuestion {
         const { question }: {
             question: {
                 answer: string,
-                anonymous: string,
             },
         } = data.view.state as any;
         const errors = {} as any;
@@ -398,7 +397,7 @@ export class KokoQuestion {
             }
 
             let update = false;
-            if (question && question.anonymous !== 'yes') {
+            if (question) {
                 for (const index in questionData.answers[encodedQuestion]) {
                     if (questionData.answers[encodedQuestion].hasOwnProperty(index)) {
                         const answer = questionData.answers[encodedQuestion][index];
@@ -411,7 +410,7 @@ export class KokoQuestion {
             }
             if (!update) {
                 questionData.answers[encodedQuestion].push({
-                    username: question && question.anonymous !== 'yes' ? data.user.username : 'Anonymous',
+                    username: data.user.username,
                     answer: question.answer,
                 });
             }
