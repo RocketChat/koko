@@ -22,7 +22,7 @@ export class KokoQuestion {
         'Are there any songs that always bring a tear to your eye?',
         'Are you a very organized person?',
         'Are you usually early or late?',
-        'Are you very active of do you prefer to just relax in your free time?',
+        'Are you very active or do you prefer to just relax in your free time?',
         'As a child, what did you think would be awesome about being an adult, but isn\'t as awesome as you thought it would be?',
         'As you get older, what are you becoming more and more afraid of?',
         'At what point is a technologically enhanced human not a human anymore?',
