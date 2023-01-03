@@ -333,6 +333,11 @@ export class KokoQuestion {
                 const encodedQuestion = Buffer.from(question).toString('base64') as string;
 
                 const assocQuestions = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
+
+                // Clear previous answers
+                answers[encodedQuestion] = [];
+
+                /* // Persist previous answers
                 const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestions);
                 if (awaitData && awaitData[0]) {
                     const questionData = awaitData[0] as IQuestionStorage;
@@ -341,6 +346,7 @@ export class KokoQuestion {
                         answers[encodedQuestion] = [];
                     }
                 }
+                */
 
                 const questionStorage: IQuestionStorage = { question, answers };
                 await persistence.updateByAssociation(assocQuestions, questionStorage, true);
