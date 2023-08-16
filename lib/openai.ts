@@ -21,18 +21,16 @@ export interface ITypedHttp<Request, Response> extends IHttp {
 }
 
 export interface IOpenAICompletionResponse {
-    choices: Array<{ message: { role: string; content: string } }>;
+    choices: Array<{ messages: { role: string; content: string } }>;
 }
 
 export type IOpenAICompletionRequest = {
     model: string;
     max_tokens: number;
-    messages: Array<IOpenAICompletionResponse['choices'][0]['message']>;
+    messages: Array<IOpenAICompletionResponse['choices'][0]['messages']>;
 };
 
 export class OpenAI {
-    private token: string;
-
     private model: string;
 
     private headers = {
@@ -57,7 +55,6 @@ export class OpenAI {
         model?: string;
     }) {
         if (token) {
-            this.token = token;
             this.headers.Authorization = `Bearer ${token}`;
         }
         if (model) this.model = model;
@@ -66,6 +63,10 @@ export class OpenAI {
     public async getCompletionsForPrompt(
         prompt: string
     ): Promise<ITypedHttpResponse<IOpenAICompletionResponse>> {
+        if (!this.headers.Authorization) {
+            throw new Error('no auth token found');
+        }
+
         const safePrompt = this.generateSafePromptForQuestionOutput(prompt);
 
         const body: IOpenAICompletionRequest = {
@@ -79,15 +80,12 @@ export class OpenAI {
             ],
         };
 
-        this.app.getLogger().debug('OpenAI request body', body);
-
         const completionUrl = 'https://api.openai.com/v1/chat/completions';
 
         const response = await this.http.post(completionUrl, {
             headers: this.headers,
             data: body,
         });
-        this.app.getLogger().debug('OpenAI response', response);
 
         return response;
     }
@@ -99,7 +97,7 @@ export class OpenAI {
             '\n' +
             'question must not include anything offensive' +
             '\n' +
-            'answer format: <question>'
+            'answer format: [question]'
         );
     }
 }

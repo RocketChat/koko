@@ -60,7 +60,7 @@ export const settings: Array<ISetting> = [
     {
         id: 'OpenAI_Model',
         type: SettingType.STRING,
-        packageValue: 'text-davinci-003',
+        packageValue: 'gpt-3.5-turbo',
         required: true,
         public: false,
         i18nLabel: 'Koko_OpenAI_Model',
