@@ -9,7 +9,10 @@ import {
     IPersistence,
     IRead,
 } from '@rocket.chat/apps-engine/definition/accessors';
-import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/api';
+import {
+    ApiSecurity,
+    ApiVisibility,
+} from '@rocket.chat/apps-engine/definition/api';
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IAppInfo } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
@@ -39,6 +42,7 @@ import { praiseModal } from './modals/PraiseModal';
 import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
+import { OpenAI } from './lib/openai';
 
 export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
@@ -122,6 +126,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     // tslint:disable-next-line:variable-name
     private _membersCache: MembersCache;
 
+    public ai: OpenAI;
+
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
         this.kokoPraise = new KokoPraise(this);
@@ -129,20 +135,42 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoOneOnOne = new KokoOneOnOne(this);
         this.kokoWellness = new KokoWellness(this);
         this.kokoValues = new KokoValues(this);
+        this.ai = new OpenAI(this);
     }
 
     /**
      * Sends a praise or answers a question
      */
-    public async executeViewSubmitHandler(context: UIKitViewSubmitInteractionContext, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify) {
+    public async executeViewSubmitHandler(
+        context: UIKitViewSubmitInteractionContext,
+        read: IRead,
+        http: IHttp,
+        persistence: IPersistence,
+        modify: IModify
+    ) {
         const data = context.getInteractionData();
         switch (data.view.id) {
             case 'praise':
-                return this.kokoPraise.submit({ context, modify, read, persistence });
+                return this.kokoPraise.submit({
+                    context,
+                    modify,
+                    read,
+                    persistence,
+                });
             case 'question':
-                return this.kokoQuestion.submit({ context, modify, read, persistence });
+                return this.kokoQuestion.submit({
+                    context,
+                    modify,
+                    read,
+                    persistence,
+                });
             case 'values':
-                return this.kokoValues.submit({ context, modify, read, persistence });
+                return this.kokoValues.submit({
+                    context,
+                    modify,
+                    read,
+                    persistence,
+                });
         }
         return {
             success: true,
@@ -152,24 +180,48 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
      * Implements the click of a button
      */
-    public async executeBlockActionHandler(context: UIKitBlockInteractionContext, read: IRead, http: IHttp, persistence: IPersistence, modify: IModify) {
+    public async executeBlockActionHandler(
+        context: UIKitBlockInteractionContext,
+        read: IRead,
+        http: IHttp,
+        persistence: IPersistence,
+        modify: IModify
+    ) {
         const data = context.getInteractionData();
         switch (data.actionId) {
             case 'praise': {
-                const modal = await praiseModal({ app: this, data, read, modify });
-                return context.getInteractionResponder().openModalViewResponse(modal);
+                const modal = await praiseModal({
+                    app: this,
+                    data,
+                    read,
+                    modify,
+                });
+                return context
+                    .getInteractionResponder()
+                    .openModalViewResponse(modal);
             }
             case 'question': {
                 const modal = await questionModal({ read, modify, data });
-                return context.getInteractionResponder().openModalViewResponse(modal);
+                return context
+                    .getInteractionResponder()
+                    .openModalViewResponse(modal);
             }
             case 'values': {
                 const modal = await valuesModal({ app: this, read, modify });
-                return context.getInteractionResponder().openModalViewResponse(modal);
+                return context
+                    .getInteractionResponder()
+                    .openModalViewResponse(modal);
             }
             case 'learnMore': {
-                const modal = await learnMoreModal({ app: this, read, modify, data });
-                return context.getInteractionResponder().openModalViewResponse(modal);
+                const modal = await learnMoreModal({
+                    app: this,
+                    read,
+                    modify,
+                    data,
+                });
+                return context
+                    .getInteractionResponder()
+                    .openModalViewResponse(modal);
             }
         }
         return {
@@ -185,23 +237,57 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
      * @param environmentRead
      * @param configModify
      */
-    public async onEnable(environmentRead: IEnvironmentRead, configModify: IConfigurationModify): Promise<boolean> {
-        this.kokoMembersRoomName = await environmentRead.getSettings().getValueById('Members_Room_Name');
+    public async onEnable(
+        environmentRead: IEnvironmentRead,
+        configModify: IConfigurationModify
+    ): Promise<boolean> {
+        this.kokoMembersRoomName = await environmentRead
+            .getSettings()
+            .getValueById('Members_Room_Name');
         if (this.kokoMembersRoomName) {
-            this.kokoMembersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
+            this.kokoMembersRoom = (await this.getAccessors()
+                .reader.getRoomReader()
+                .getByName(this.kokoMembersRoomName)) as IRoom;
         }
-        this.kokoPostPraiseRoomName = await environmentRead.getSettings().getValueById('Post_Praise_Room_Name');
+        this.kokoPostPraiseRoomName = await environmentRead
+            .getSettings()
+            .getValueById('Post_Praise_Room_Name');
         if (this.kokoPostPraiseRoomName) {
-            this.kokoPostPraiseRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
+            this.kokoPostPraiseRoom = (await this.getAccessors()
+                .reader.getRoomReader()
+                .getByName(this.kokoPostPraiseRoomName)) as IRoom;
         }
-        this.kokoPostAnswersRoomName = await environmentRead.getSettings().getValueById('Post_Answers_Room_Name');
+        this.kokoPostAnswersRoomName = await environmentRead
+            .getSettings()
+            .getValueById('Post_Answers_Room_Name');
         if (this.kokoPostAnswersRoomName) {
-            this.kokoPostAnswersRoom = await this.getAccessors().reader.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
+            this.kokoPostAnswersRoom = (await this.getAccessors()
+                .reader.getRoomReader()
+                .getByName(this.kokoPostAnswersRoomName)) as IRoom;
         }
-        this.botUsername = await environmentRead.getSettings().getValueById('Bot_Username');
+        this.botUsername = await environmentRead
+            .getSettings()
+            .getValueById('Bot_Username');
         if (this.botUsername) {
-            this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
+            this.botUser = (await this.getAccessors()
+                .reader.getUserReader()
+                .getByUsername(this.botUsername)) as IUser;
         }
+
+        const token = await environmentRead
+            .getSettings()
+            .getValueById('OpenAI_Token');
+        if (token) {
+            this.ai.refreshCofiguration({ token });
+        }
+
+        const model = await environmentRead
+            .getSettings()
+            .getValueById('OpenAI_Model');
+        if (model) {
+            this.ai.refreshCofiguration({ model });
+        }
+
         return true;
     }
 
@@ -213,31 +299,50 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
      * @param read
      * @param http
      */
-    public async onSettingUpdated(setting: ISetting, configModify: IConfigurationModify, read: IRead, http: IHttp): Promise<void> {
+    public async onSettingUpdated(
+        setting: ISetting,
+        configModify: IConfigurationModify,
+        read: IRead,
+        http: IHttp
+    ): Promise<void> {
         switch (setting.id) {
             case 'Members_Room_Name':
                 this.kokoMembersRoomName = setting.value;
                 if (this.kokoMembersRoomName) {
-                    this.kokoMembersRoom = await read.getRoomReader().getByName(this.kokoMembersRoomName) as IRoom;
+                    this.kokoMembersRoom = (await read
+                        .getRoomReader()
+                        .getByName(this.kokoMembersRoomName)) as IRoom;
                 }
                 break;
             case 'Post_Praise_Room_Name':
                 this.kokoPostPraiseRoomName = setting.value;
                 if (this.kokoPostPraiseRoomName) {
-                    this.kokoPostPraiseRoom = await read.getRoomReader().getByName(this.kokoPostPraiseRoomName) as IRoom;
+                    this.kokoPostPraiseRoom = (await read
+                        .getRoomReader()
+                        .getByName(this.kokoPostPraiseRoomName)) as IRoom;
                 }
                 break;
             case 'Post_Answers_Room_Name':
                 this.kokoPostAnswersRoomName = setting.value;
                 if (this.kokoPostAnswersRoomName) {
-                    this.kokoPostAnswersRoom = await read.getRoomReader().getByName(this.kokoPostAnswersRoomName) as IRoom;
+                    this.kokoPostAnswersRoom = (await read
+                        .getRoomReader()
+                        .getByName(this.kokoPostAnswersRoomName)) as IRoom;
                 }
                 break;
             case 'Bot_User':
                 this.botUsername = setting.value;
                 if (this.botUsername) {
-                    this.botUser = await read.getUserReader().getByUsername(this.botUsername) as IUser;
+                    this.botUser = (await read
+                        .getUserReader()
+                        .getByUsername(this.botUsername)) as IUser;
                 }
+                break;
+            case 'OpenAI_Token':
+                this.ai.refreshCofiguration({ token: setting.value });
+                break;
+            case 'OpenAI_Model':
+                this.ai.refreshCofiguration({ model: setting.value });
                 break;
         }
     }
@@ -249,9 +354,15 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
      *
      * @param configuration
      */
-    protected async extendConfiguration(configuration: IConfigurationExtend): Promise<void> {
+    protected async extendConfiguration(
+        configuration: IConfigurationExtend
+    ): Promise<void> {
         // Settings
-        await Promise.all(settings.map((setting) => configuration.settings.provideSetting(setting)));
+        await Promise.all(
+            settings.map((setting) =>
+                configuration.settings.provideSetting(setting)
+            )
+        );
 
         // API endpoints
         await configuration.api.provideApi({
@@ -267,7 +378,9 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         });
 
         // Slash Commands
-        await configuration.slashCommands.provideSlashCommand(new KokoCommand(this));
+        await configuration.slashCommands.provideSlashCommand(
+            new KokoCommand(this)
+        );
 
         // Scheduler
         configuration.scheduler.registerProcessors([
@@ -278,8 +391,21 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     interval: '15 14 * * 1',
                     data: { appId: this.getID() },
                 },
-                processor: async (jobContext, read, modify, http, persistence) => {
-                    this.kokoPraise.run(read, modify, persistence, undefined, undefined, this.kokoPraise.sendScore ? 'praisers' : undefined);
+                processor: async (
+                    jobContext,
+                    read,
+                    modify,
+                    http,
+                    persistence
+                ) => {
+                    this.kokoPraise.run(
+                        read,
+                        modify,
+                        persistence,
+                        undefined,
+                        undefined,
+                        this.kokoPraise.sendScore ? 'praisers' : undefined
+                    );
                     this.kokoPraise.sendScore = !this.kokoPraise.sendScore;
                 },
             },
@@ -290,7 +416,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     interval: '0 15 * * 1,4',
                     data: { appId: this.getID() },
                 },
-                processor: async (jobContext, read, modify, http, persistence) => {
+                processor: async (
+                    jobContext,
+                    read,
+                    modify,
+                    http,
+                    persistence
+                ) => {
                     this.kokoQuestion.run(read, modify, persistence);
                 },
             },
@@ -301,7 +433,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     interval: '0 17 * * 2',
                     data: { appId: this.getID() },
                 },
-                processor: async (jobContext, read, modify, http, persistence) => {
+                processor: async (
+                    jobContext,
+                    read,
+                    modify,
+                    http,
+                    persistence
+                ) => {
                     this.kokoOneOnOne.run(read, modify, persistence);
                 },
             },
@@ -312,7 +450,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     interval: '0 13 * * 1,3,5',
                     data: { appId: this.getID() },
                 },
-                processor: async (jobContext, read, modify, http, persistence) => {
+                processor: async (
+                    jobContext,
+                    read,
+                    modify,
+                    http,
+                    persistence
+                ) => {
                     this.kokoWellness.run(read, modify, persistence);
                 },
             },
@@ -323,7 +467,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     interval: '0 16 * * 5',
                     data: { appId: this.getID() },
                 },
-                processor: async (jobContext, read, modify, http, persistence) => {
+                processor: async (
+                    jobContext,
+                    read,
+                    modify,
+                    http,
+                    persistence
+                ) => {
                     this.kokoValues.run(read, modify, persistence);
                 },
             },

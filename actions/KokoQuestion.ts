@@ -1,5 +1,12 @@
-import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
+import {
+    IModify,
+    IPersistence,
+    IRead,
+} from '@rocket.chat/apps-engine/definition/accessors';
+import {
+    RocketChatAssociationModel,
+    RocketChatAssociationRecord,
+} from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
 import { IUser } from '@rocket.chat/apps-engine/definition/users';
@@ -7,7 +14,13 @@ import { Buffer } from 'buffer';
 
 import { createQuestionBlocks } from '../blocks/QuestionBlocks';
 import { KokoApp } from '../KokoApp';
-import { getDirect, getMembers, notifyUser, random, sendMessage } from '../lib/helpers';
+import {
+    getDirect,
+    getMembers,
+    notifyUser,
+    random,
+    sendMessage,
+} from '../lib/helpers';
 import { answerRegisteredModal } from '../modals/QuestionModal';
 import { IAnswer, IAnswerStorage } from '../storage/IAnswerStorage';
 import { IQuestionStorage } from '../storage/IQuestionStorage';
@@ -17,20 +30,20 @@ export class KokoQuestion {
     private questions = [
         'Among your friends or family, what are you famous for?',
         'An app mysteriously appears on your phone that does something amazing. What does it do?',
-        'An epic feast is held in your honor, what\'s on the table?',
-        'Are all individuals morally obligated to save another person\'s life if they are able? What if that person lives in another country?',
+        "An epic feast is held in your honor, what's on the table?",
+        "Are all individuals morally obligated to save another person's life if they are able? What if that person lives in another country?",
         'Are there any songs that always bring a tear to your eye?',
         'Are you a very organized person?',
         'Are you usually early or late?',
         'Are you very active or do you prefer to just relax in your free time?',
-        'As a child, what did you think would be awesome about being an adult, but isn\'t as awesome as you thought it would be?',
+        "As a child, what did you think would be awesome about being an adult, but isn't as awesome as you thought it would be?",
         'As you get older, what are you becoming more and more afraid of?',
         'At what point is a technologically enhanced human not a human anymore?',
         'Can you think of any technology that has only made the world worse? How about a piece of technology that has only made the world better?',
         'Do you always have to have the latest phone?',
         'Do you care about fashion? What style of clothes do you usually wear?',
-        'Do you eat food that\'s past its expiration date if it still smells and looks fine?',
-        'Do you experience phantom vibration? (Feeling your phone vibrate even though it didn\'t.)',
+        "Do you eat food that's past its expiration date if it still smells and looks fine?",
+        "Do you experience phantom vibration? (Feeling your phone vibrate even though it didn't.)",
         'Do you have any pets? What are their names?',
         'Do you like documentaries? Why / why not?',
         'Do you like going to concerts? Why or why not? What was the last concert you went to?',
@@ -51,20 +64,20 @@ export class KokoQuestion {
         'Do you think that humans will ever be able to live together in harmony?',
         'Do you usually achieve goals you set? Why or why not?',
         'Do you wish there were more or less holidays? Why?',
-        'Does a person\'s name influence the person they become?',
+        "Does a person's name influence the person they become?",
         'Does anonymity encourage people to misbehave or does it reveal how people would choose to act all the time if they could?',
         'Does fate exist? If so, do we have free will?',
         'Does having a day off for a holiday increase or decrease productivity at work?',
         'Has anyone ever saved your life?',
         'Have you ever given to any charities?',
-        'Have you ever saved an animal\'s life? How about a person\'s life?',
+        "Have you ever saved an animal's life? How about a person's life?",
         'Have you ever spoke in front of a large group of people? How did it go?',
         'Have you traveled to any different countries? Which ones?',
         'Have your parents influenced what goals you have?',
         'How ambitious are you?',
         'How different was your life one year ago?',
         'How do you feel if you accidentally leave your phone at home?',
-        'How do you make yourself sleep when you can\'t seem to get to sleep?',
+        "How do you make yourself sleep when you can't seem to get to sleep?",
         'How do you plan to make the world a better place?',
         'How do you relax after a hard day of work?',
         'How do you think traveling to a lot of different countries changes a person?',
@@ -91,7 +104,7 @@ export class KokoQuestion {
         'If you could make a 20 second phone call to yourself at any point in your life present or future, when would you call and what would you say?',
         'If you could make one rule that everyone had to follow, what rule would you make?',
         'If you could press a button and receive a million dollars, but one stranger would die, would you press the button? And if so, how many times?',
-        'If you didn\'t have to sleep, what would you do with the extra time?',
+        "If you didn't have to sleep, what would you do with the extra time?",
         'If you wanted to slowly drive a roommate insane using only notes, what kind of notes would you leave around the house?',
         'If you were moving to another country, but could only pack one carry-on sized bag, what would you pack?',
         'In what situation or place would you feel the most out of place in?',
@@ -102,22 +115,22 @@ export class KokoQuestion {
         'Is there a meaning to life? If so, what is it?',
         'Time freezes for everyone but you for one day. What do you do?',
         'Was there ever an event in your life that defied explanation?',
-        'What \'old person\' things do you do?',
+        "What 'old person' things do you do?",
         'What activities cause you to feel like you are living life to the fullest?',
         'What always cheers you up when you think about it?',
         'What amazing thing did you do that no one was around to see?',
-        'What app can you not believe someone hasn\'t made yet?',
+        "What app can you not believe someone hasn't made yet?",
         'What apps have changed your life a lot?',
         'What are some goals you have already achieved? What are some goals you have failed to accomplish?',
         'What are some misconceptions about your hobby?',
-        'What are some of the best vacations you\'ve had?',
+        "What are some of the best vacations you've had?",
         'What are some of the events in your life that made you who you are?',
-        'What are some of your personal \'rules\' that you never break?',
+        "What are some of your personal 'rules' that you never break?",
         'What are some red flags to watch out for in daily life?',
         'What are some small things that make your day better?',
         'What are three interesting facts about you?',
         'What are you addicted to?',
-        'What are you interested in that most people aren\'t?',
+        "What are you interested in that most people aren't?",
         'What are you most likely to become famous for?',
         'What are you most likely very wrong about?',
         'What are you most looking forward to in the next 10 years?',
@@ -130,7 +143,7 @@ export class KokoQuestion {
         'What challenging thing are you working through these days?',
         'What company do you despise and why?',
         'What could you do with two million dollars to impact the most amount of people?',
-        'What did you think you would grow out of but haven\'t?',
+        "What did you think you would grow out of but haven't?",
         'What do a lot of people have very strong opinions about, even though they know very little about it?',
         'What do a lot of people hope will happen but is just not going to happen?',
         'What do app makers do that really annoys you?',
@@ -149,27 +162,27 @@ export class KokoQuestion {
         'What do you think of online education?',
         'What do you think of tattoos? Do you have any?',
         'What do you think you do better than 90% of people?',
-        'What do you wish you could tell yourself 10 years ago? What do you think you\'ll want to tell your current self 10 years from now?',
+        "What do you wish you could tell yourself 10 years ago? What do you think you'll want to tell your current self 10 years from now?",
         'What flavor of ice cream do you wish existed?',
         'What habit do you have now that you wish you started much earlier?',
         'What has someone borrowed but never given back?',
-        'What hobby would you get into if time and money weren\'t an issue?',
-        'What horror story do you have from a job you\'ve had?',
+        "What hobby would you get into if time and money weren't an issue?",
+        "What horror story do you have from a job you've had?",
         'What is something that is popular now that annoys you?',
-        'What is something that really annoys you but doesn\'t bother most people?',
-        'What is something that your friends would consider \'so you\'?',
-        'What is something you are certain you\'ll never experience?',
+        "What is something that really annoys you but doesn't bother most people?",
+        "What is something that your friends would consider 'so you'?",
+        "What is something you are certain you'll never experience?",
         'What is the luckiest thing that has happened to you?',
         'What is the strangest thing you have come across?',
         'What is the worst hotel you have stayed at? How about the best hotel?',
         'What is your favorite food?',
-        'What job doesn\'t exist now but will exist in the future?',
+        "What job doesn't exist now but will exist in the future?",
         'What job would you be terrible at?',
         'What languages do you wish you could speak?',
         'What life skills are rarely taught but extremely useful?',
         'What makes you roll your eyes every time you hear it?',
         'What problems will technology solve in the next 5 years? What problems will it create?',
-        'What product do you wish a company would make a \'smart\' version of?',
+        "What product do you wish a company would make a 'smart' version of?",
         'What product or service is way more expensive than it needs to be?',
         'What question can you ask to find out the most about a person?',
         'What question would you most like to know the answer to?',
@@ -181,26 +194,26 @@ export class KokoQuestion {
         'What three words best describe you?',
         'What values are most important to you?',
         'What was ruined because it became popular?',
-        'What was the best birthday wish or gift you\'ve ever received?',
+        "What was the best birthday wish or gift you've ever received?",
         'What was the last book you read?',
         'What was the last funny video you saw?',
         'What was the last time you worked incredibly hard?',
-        'What was the most memorable gift you\'ve received?',
-        'What was the worst shopping experience you\'ve ever had?',
+        "What was the most memorable gift you've received?",
+        "What was the worst shopping experience you've ever had?",
         'What was your first smartphone? How did you feel when you got it?',
         'What was your most recent lie?',
         'What website do you visit most often?',
         'What weird food combinations do you really enjoy?',
         'What would be your ideal way to spend the weekend?',
         'What would you rate 10 / 10?',
-        'What\'s incredibly cheap and you would pay way more for?',
-        'What\'s something that happened or something that someone said that changed how you view the world?',
-        'What\'s the best thing that happened to you last week?',
-        'What\'s the cutest thing you can imagine? Something so cute it\'s almost painful.',
-        'What\'s the farthest you\'ve ever been from home?',
-        'What\'s the hardest lesson you\'ve learned?',
-        'What\'s the weirdest text or email you\'ve gotten?',
-        'What\'s your favorite season? Why?',
+        "What's incredibly cheap and you would pay way more for?",
+        "What's something that happened or something that someone said that changed how you view the world?",
+        "What's the best thing that happened to you last week?",
+        "What's the cutest thing you can imagine? Something so cute it's almost painful.",
+        "What's the farthest you've ever been from home?",
+        "What's the hardest lesson you've learned?",
+        "What's the weirdest text or email you've gotten?",
+        "What's your favorite season? Why?",
         'When did something start out badly for you but in the end, it was great?',
         'When people come to you for help, what do they usually want help with?',
         'When was the last time you climbed a tree?',
@@ -225,7 +238,7 @@ export class KokoQuestion {
         'Would you rather live on the beach or in a cabin in the woods?',
         'Would you rather not be able to open any closed doors (locked or unlocked) or not be able to close any open doors?',
         'Would you rather travel the world for a year on a shoe string budget or stay in only one country for a year but live in luxury?',
-        'Would you want the ability to hear the thoughts of people near you if you couldn\'t turn the ability off?',
+        "Would you want the ability to hear the thoughts of people near you if you couldn't turn the ability off?",
         'You are sent back to the day the titanic set sail with nothing but a 3rd class ticket (and food water ect) your task is to stop the titanic from sinking, how do you do this?',
         'What was your "How didn\'t they notice?" moment?',
         'What phrases are you really sick of hearing?',
@@ -234,7 +247,7 @@ export class KokoQuestion {
         'You have one hour to eat 5,000 calories, what food do you choose?',
         'If you could make one thing illegal, what would it be?',
         'What is something you fear at night?',
-        'What\'s that dumb thing you did years ago that you can\'t stop thinking about?',
+        "What's that dumb thing you did years ago that you can't stop thinking about?",
         'What stereotype about your country is actually pretty accurate?',
         'What turns you into a little kid?',
         'What is generally more dangerous than people think?',
@@ -242,8 +255,8 @@ export class KokoQuestion {
         'Which TV series eventually won you over, after refusing to give it a shot?',
         'You are now a YouTuber with over 5 Million subscribers. What content are you posting?',
         'What is your daily moment of peace?',
-        'What\'s a thing many people do but is actually pretty disrespectful ?',
-        'What feels like some money laundering scheme in the area where you live but can\'t prove it?',
+        "What's a thing many people do but is actually pretty disrespectful ?",
+        "What feels like some money laundering scheme in the area where you live but can't prove it?",
         'What silly thing did you worry about when you were a kid?',
         'What is your favorite quote?',
         'You can choose to live in any movie. Which one do you choose and why?',
@@ -255,11 +268,11 @@ export class KokoQuestion {
         'How was your day, yesterday?',
         'What is the first thing you notice about a person?',
         'If you could only take 3 things with you onto an abandoned island what would you take?',
-        'What is something someone told you that you\'ll never forget?',
-        'What is the weirdest dream you\'ve ever had?',
+        "What is something someone told you that you'll never forget?",
+        "What is the weirdest dream you've ever had?",
         'In what ways would the world be different if religion never existed?',
-        'What\'s the best thing to say to the cops after you killed someone?',
-        'What\'s your nickname and why?',
+        "What's the best thing to say to the cops after you killed someone?",
+        "What's your nickname and why?",
         'What do you want on your tombstone?',
         'What is the worst thing you could whisper when hugging someone?',
         'How to make time go by really fast?',
@@ -273,7 +286,7 @@ export class KokoQuestion {
         'What is something that has aged well?',
         'What movie will you always recommend to people?',
         'What was a huge trend that everyone forgot about?',
-        'What\'s the craziest butterfly effect that happened to you because of a small decision you made?',
+        "What's the craziest butterfly effect that happened to you because of a small decision you made?",
         'How is your day going?',
         'What’s the most overpriced thing you’ve seen?',
         'What is something about yourself that sounds totally made up but is 100% real?',
@@ -281,63 +294,100 @@ export class KokoQuestion {
         'What invention is so good that it actually can’t be improved upon?',
         'Have you ever laughed so hysterically at something so simple you were starting to get worried that you were losing your sanity? What was it?',
         'What song/movie/tv show is 10/10, yet hardly anyone has heard of it?',
-        'What\'s the weirdest compliment you\'ve ever been given?',
+        "What's the weirdest compliment you've ever been given?",
         'What small thing makes you automatically distrust someone?',
-        'You\'re being interrogated and so far you\'ve held strong. What song do they play on repeat that breaks you?',
+        "You're being interrogated and so far you've held strong. What song do they play on repeat that breaks you?",
         'If you could telepathically say something that all 7.8 Billion people on earth could hear at once what would it be?',
-        'If you had enough money to build your dream house, what\'s a strange room/feature you\'d include?',
+        "If you had enough money to build your dream house, what's a strange room/feature you'd include?",
         'What advice would you give to someone 10 years younger than you?',
         'If you could singlehandedly choose anyone (alive, dead, or fictional character) to be the next president of your country, who would you choose and why?',
-        'If Covid never happened, what would\'ve you done in 2020?',
+        "If Covid never happened, what would've you done in 2020?",
         'What food do you swear people only pretend to like?',
         'In what movie did you like the bad guy more than the good guy?',
-        'What\'s your favorite short joke?',
-        'You\'re tired from the human race, so you decide to help an advanced alien civilization destroy the Earth, what tips would you give them?',
+        "What's your favorite short joke?",
+        "You're tired from the human race, so you decide to help an advanced alien civilization destroy the Earth, what tips would you give them?",
         'What is the greatest comeback to a insult you’ve ever heard?',
-        'What\'s the dumbest way you\'ve gotten a scar?',
+        "What's the dumbest way you've gotten a scar?",
         'Steve Irwin has you pinned down in a headlock, what cool facts does he tell the audience about you and your habitat?',
-        'What movie could have been over in 10 minutes if the main character wasn\'t such a fool?',
+        "What movie could have been over in 10 minutes if the main character wasn't such a fool?",
         'What makes you optimistic about the future?',
         'Which album do you think has no bad songs on it, and can be listened all the way through?',
         'What will never be the same again once the pandemic is over?',
         'What’s a small act of kindness you were once shown, that you’ll never forget?',
-        'You have died and find that instead of going to heaven, you\'ve only leveled up to Earth 2.0. What are some things that make Earth 2.0 better but not quite heaven?',
+        "You have died and find that instead of going to heaven, you've only leveled up to Earth 2.0. What are some things that make Earth 2.0 better but not quite heaven?",
         'If cats had pockets what would you find in your cats pockets?',
         'What happened in the past week that made you happy?',
         'Without saying what the category is, what are your top five?',
         'You can fully communicate with your pet for 24 straight hours. How do you spend this time?',
         'If someone borrowed your body for a week, what quirks would you tell them about so they are prepared?',
         'What is your "I was into X before it was cool" thing?',
-        'What\'s a really cheap item you can buy that can make you look incredibly rich?',
+        "What's a really cheap item you can buy that can make you look incredibly rich?",
         'What is normal in your country but seems weird to the rest of the world?',
-        'What’s a very common thing that you just can\'t relate to?',
-        'Which fictional character\'s death have you not gotten over?',
+        "What’s a very common thing that you just can't relate to?",
+        "Which fictional character's death have you not gotten over?",
         'What is one of the dumbest things you\'ve done when your brain was on "auto-pilot"?',
     ];
 
     constructor(private readonly app: KokoApp) {}
 
     public async run(read: IRead, modify: IModify, persistence: IPersistence) {
-        if (this.app.botUser !== undefined && this.app.kokoMembersRoom !== undefined && this.app.kokoPostAnswersRoom !== undefined) {
+        if (
+            this.app.botUser === undefined ||
+            this.app.kokoMembersRoom === undefined ||
+            this.app.kokoPostAnswersRoom === undefined
+        ) {
+            return;
+        }
 
-            // Gets room members (removes rocket.cat and koko bot)
-            const members = await getMembers(this.app, read);
+        // Gets room members (removes rocket.cat and koko bot)
+        const members = await getMembers(this.app, read);
 
-            if (members) {
-                // Posts previous answers as soon as new questions are being sent
-                await this.postAnswers(read, modify, persistence);
+        if (!members?.length) {
+            return;
+        }
 
-                // Saves a random question in storage
-                let answers = {};
-                const question = this.questions[random(0, this.questions.length - 1)];
-                const encodedQuestion = Buffer.from(question).toString('base64') as string;
+        const shouldUseOpenAI: boolean = await read
+            .getEnvironmentReader()
+            .getSettings()
+            .getValueById('Use_OpenAI');
 
-                const assocQuestions = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
+        console.log('should use openai', shouldUseOpenAI);
 
-                // Clear previous answers
-                answers[encodedQuestion] = [];
+        let question: string;
 
-                /* // Persist previous answers
+        if (shouldUseOpenAI) {
+            const prompt: string = await read
+                .getEnvironmentReader()
+                .getSettings()
+                .getValueById('OpenAI_Question_Prompt');
+            const res = await this.app.ai.getCompletionsForPrompt(prompt)
+            this.app.getLogger().debug(res)
+            question= prompt
+        } else {
+            question = this.questions[random(0, this.questions.length - 1)];
+        }
+
+        console.log('question', question);
+
+        // Posts previous answers as soon as new questions are being sent
+        await this.postAnswers(read, modify, persistence);
+
+        // Saves a random question in storage
+        let answers = {};
+
+        const encodedQuestion = Buffer.from(question).toString(
+            'base64'
+        ) as string;
+
+        const assocQuestions = new RocketChatAssociationRecord(
+            RocketChatAssociationModel.MISC,
+            'questions'
+        );
+
+        // Clear previous answers
+        answers[encodedQuestion] = [];
+
+        /* // Persist previous answers
                 const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestions);
                 if (awaitData && awaitData[0]) {
                     const questionData = awaitData[0] as IQuestionStorage;
@@ -348,23 +398,30 @@ export class KokoQuestion {
                 }
                 */
 
-                const questionStorage: IQuestionStorage = { question, answers };
-                await persistence.updateByAssociation(assocQuestions, questionStorage, true);
+        const questionStorage: IQuestionStorage = { question, answers };
+        await persistence.updateByAssociation(
+            assocQuestions,
+            questionStorage,
+            true
+        );
 
-                // Sends message to each member
-                for (const member of members) {
-                    if (member.id === this.app.botUser.id) {
-                        continue;
-                    }
-
-                    // Gets or creates a direct message room between botUser and member
-                    const room = await getDirect(this.app, read, modify, member.username) as IRoom;
-
-                    // Creates praise blocks
-                    const blocks = createQuestionBlocks(modify, question);
-                    await sendMessage(this.app, modify, room, question, [], blocks);
-                }
+        // Sends message to each member
+        for (const member of members) {
+            if (member.id === this.app.botUser.id) {
+                continue;
             }
+
+            // Gets or creates a direct message room between botUser and member
+            const room = (await getDirect(
+                this.app,
+                read,
+                modify,
+                member.username
+            )) as IRoom;
+
+            // Creates praise blocks
+            const blocks = createQuestionBlocks(modify, question);
+            await sendMessage(this.app, modify, room, question, [], blocks);
         }
     }
 
@@ -373,15 +430,31 @@ export class KokoQuestion {
      * Then sends a praise to the selected users
      */
     // tslint:disable-next-line:max-line-length
-    public async submit({ context, modify, read, persistence }: { context: UIKitViewSubmitInteractionContext, modify: IModify, read: IRead, persistence: IPersistence }) {
+    public async submit({
+        context,
+        modify,
+        read,
+        persistence,
+    }: {
+        context: UIKitViewSubmitInteractionContext;
+        modify: IModify;
+        read: IRead;
+        persistence: IPersistence;
+    }) {
         const data = context.getInteractionData();
-        const { question }: {
+        const {
+            question,
+        }: {
             question: {
-                answer: string,
-            },
+                answer: string;
+            };
         } = data.view.state as any;
         const errors = {} as any;
-        if (question === undefined || question.answer === undefined || question.answer.length === 0) {
+        if (
+            question === undefined ||
+            question.answer === undefined ||
+            question.answer.length === 0
+        ) {
             errors.answer = 'Please type your answer';
         }
         if (Object.keys(errors).length > 0) {
@@ -391,12 +464,19 @@ export class KokoQuestion {
             });
         }
 
-        const assocQuestions = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
-        const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestions);
+        const assocQuestions = new RocketChatAssociationRecord(
+            RocketChatAssociationModel.MISC,
+            'questions'
+        );
+        const awaitData = await read
+            .getPersistenceReader()
+            .readByAssociation(assocQuestions);
         if (awaitData && awaitData[0]) {
             const questionData = awaitData[0] as IQuestionStorage;
             const lastQuestion = questionData.question;
-            const encodedQuestion = Buffer.from(lastQuestion).toString('base64') as string;
+            const encodedQuestion = Buffer.from(lastQuestion).toString(
+                'base64'
+            ) as string;
 
             if (questionData.answers[encodedQuestion] === undefined) {
                 questionData.answers[encodedQuestion] = [];
@@ -405,11 +485,18 @@ export class KokoQuestion {
             let update = false;
             if (question) {
                 for (const index in questionData.answers[encodedQuestion]) {
-                    if (questionData.answers[encodedQuestion].hasOwnProperty(index)) {
-                        const answer = questionData.answers[encodedQuestion][index];
+                    if (
+                        questionData.answers[encodedQuestion].hasOwnProperty(
+                            index
+                        )
+                    ) {
+                        const answer =
+                            questionData.answers[encodedQuestion][index];
                         if (answer.username === data.user.username) {
                             update = true;
-                            questionData.answers[encodedQuestion][index].answer = question.answer;
+                            questionData.answers[encodedQuestion][
+                                index
+                            ].answer = question.answer;
                         }
                     }
                 }
@@ -421,8 +508,15 @@ export class KokoQuestion {
                 });
             }
 
-            const questionStorage: IQuestionStorage = { question: lastQuestion, answers: questionData.answers };
-            await persistence.updateByAssociation(assocQuestions, questionStorage, true);
+            const questionStorage: IQuestionStorage = {
+                question: lastQuestion,
+                answers: questionData.answers,
+            };
+            await persistence.updateByAssociation(
+                assocQuestions,
+                questionStorage,
+                true
+            );
 
             // // Notifies user that his answer is saved
             // const room = await getDirect(this.app, read, modify, data.user.username) as IRoom;
@@ -430,7 +524,9 @@ export class KokoQuestion {
             // await notifyUser(this.app, modify, room, data.user, msg);
 
             const modal = await answerRegisteredModal({ read, modify, data });
-            return context.getInteractionResponder().updateModalViewResponse(modal);
+            return context
+                .getInteractionResponder()
+                .updateModalViewResponse(modal);
         }
 
         return {
@@ -448,17 +544,35 @@ export class KokoQuestion {
      * @param text the message to get username or praise from
      */
     // tslint:disable-next-line:max-line-length
-    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, text: string) {
+    public async answer(
+        read: IRead,
+        modify: IModify,
+        persistence: IPersistence,
+        sender: IUser,
+        room: IRoom,
+        text: string
+    ) {
         // Removes listening record from persistence storage
-        const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
+        const association = new RocketChatAssociationRecord(
+            RocketChatAssociationModel.USER,
+            sender.id
+        );
         await persistence.removeByAssociation(association);
 
         // Saves the answer
         const answer: IAnswer = { username: sender.username, answer: text };
         let answerStorage: IAnswerStorage;
-        const assocAnswer = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'answer');
-        const awaitData = await read.getPersistenceReader().readByAssociation(assocAnswer);
-        const data = awaitData && awaitData.length > 0 && awaitData[0] as IAnswerStorage;
+        const assocAnswer = new RocketChatAssociationRecord(
+            RocketChatAssociationModel.MISC,
+            'answer'
+        );
+        const awaitData = await read
+            .getPersistenceReader()
+            .readByAssociation(assocAnswer);
+        const data =
+            awaitData &&
+            awaitData.length > 0 &&
+            (awaitData[0] as IAnswerStorage);
         if (!data) {
             answerStorage = [answer];
         } else {
@@ -492,13 +606,24 @@ export class KokoQuestion {
      * @param modify
      * @param persistence
      */
-    public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence) {
+    public async postAnswers(
+        read: IRead,
+        modify: IModify,
+        persistence: IPersistence
+    ) {
         if (this.app.kokoPostAnswersRoom) {
-            const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'questions');
-            const awaitData = await read.getPersistenceReader().readByAssociation(assocQuestion);
+            const assocQuestion = new RocketChatAssociationRecord(
+                RocketChatAssociationModel.MISC,
+                'questions'
+            );
+            const awaitData = await read
+                .getPersistenceReader()
+                .readByAssociation(assocQuestion);
             if (awaitData && awaitData[0]) {
                 const question = awaitData[0] as IQuestionStorage;
-                const encodedQuestion = Buffer.from(question.question).toString('base64') as string;
+                const encodedQuestion = Buffer.from(question.question).toString(
+                    'base64'
+                ) as string;
 
                 // Start building the message that will be sent to answers channel
                 let text = `*${question.question}*\n\n`;
@@ -507,8 +632,13 @@ export class KokoQuestion {
                     text += `*${answer.username}*: ${answer.answer}\n`;
                 });
 
-                    // Message is built, send
-                await sendMessage(this.app, modify, this.app.kokoPostAnswersRoom, text);
+                // Message is built, send
+                await sendMessage(
+                    this.app,
+                    modify,
+                    this.app.kokoPostAnswersRoom,
+                    text
+                );
             }
         }
     }

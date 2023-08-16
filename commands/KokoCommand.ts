@@ -1,5 +1,13 @@
-import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { ISlashCommand, SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
+import {
+    IHttp,
+    IModify,
+    IPersistence,
+    IRead,
+} from '@rocket.chat/apps-engine/definition/accessors';
+import {
+    ISlashCommand,
+    SlashCommandContext,
+} from '@rocket.chat/apps-engine/definition/slashcommands';
 
 import { KokoApp } from '../KokoApp';
 import { getMembers, notifyUser } from '../lib/helpers';
@@ -23,18 +31,30 @@ export class KokoCommand implements ISlashCommand {
         OneOnOne: 'one-on-one',
         OneOnOneNumeral: '1:1',
         Send: 'send',
+        Trigger: 'trigger',
     };
 
-    constructor(private readonly app: KokoApp) { }
-    public async executor(context: SlashCommandContext, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<void> {
-
+    constructor(private readonly app: KokoApp) {}
+    public async executor(
+        context: SlashCommandContext,
+        read: IRead,
+        modify: IModify,
+        http: IHttp,
+        persistence: IPersistence
+    ): Promise<void> {
         // Gets room members (removes rocket.cat and koko bot)
         const members = await getMembers(this.app, read);
         const sender = context.getSender();
         const room = context.getRoom();
 
-        if (!(members.some((member) => member.username === sender.username))) {
-            return await notifyUser(this.app, modify, room, sender, `You are not allowed to run this command.`);
+        if (!members.some((member) => member.username === sender.username)) {
+            return await notifyUser(
+                this.app,
+                modify,
+                room,
+                sender,
+                `You are not allowed to run this command.`
+            );
         }
 
         const [command, ...params] = context.getArguments();
@@ -44,17 +64,46 @@ export class KokoCommand implements ISlashCommand {
 
         switch (command) {
             case this.CommandEnum.Praise:
-                await processPraiseCommand(this.app, context, read, modify, persistence, params);
+                await processPraiseCommand(
+                    this.app,
+                    context,
+                    read,
+                    modify,
+                    persistence,
+                    params
+                );
                 break;
             case this.CommandEnum.Question:
-                await processQuestionCommand(this.app, context, read, modify, persistence);
+                await processQuestionCommand(
+                    this.app,
+                    context,
+                    read,
+                    modify,
+                    persistence
+                );
                 break;
             case this.CommandEnum.OneOnOne:
             case this.CommandEnum.OneOnOneNumeral:
-                await processOneOnOneCommand(this.app, context, read, modify, persistence, params);
+                await processOneOnOneCommand(
+                    this.app,
+                    context,
+                    read,
+                    modify,
+                    persistence,
+                    params
+                );
                 break;
             case this.CommandEnum.Cancel:
-                await processCancelCommand(this.app, context, read, modify, persistence);
+                await processCancelCommand(
+                    this.app,
+                    context,
+                    read,
+                    modify,
+                    persistence
+                );
+                break;
+            case this.CommandEnum.Trigger:
+                this.app.kokoQuestion.run(read, modify, persistence);
                 break;
             default:
                 await processHelpCommand(this.app, context, read, modify);
