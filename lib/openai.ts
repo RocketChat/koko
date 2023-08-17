@@ -5,6 +5,18 @@ import type {
 } from '@rocket.chat/apps-engine/definition/accessors';
 import type { KokoApp } from '../KokoApp';
 
+declare module '../KokoApp' {
+    // @ts-ignore
+    interface KokoApp {
+        getAccessors(): {
+            http: ITypedHttp<
+                IOpenAICompletionRequest,
+                IOpenAICompletionResponse
+            >;
+        };
+    }
+}
+
 export interface ITypedHttpResponse<T> extends IHttpResponse {
     data?: T;
 }
