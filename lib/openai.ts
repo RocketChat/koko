@@ -21,13 +21,13 @@ export interface ITypedHttp<Request, Response> extends IHttp {
 }
 
 export interface IOpenAICompletionResponse {
-    choices: Array<{ messages: { role: string; content: string } }>;
+    choices: Array<{ message: { role: string; content: string } }>;
 }
 
 export type IOpenAICompletionRequest = {
     model: string;
     max_tokens: number;
-    messages: Array<IOpenAICompletionResponse['choices'][0]['messages']>;
+    messages: Array<IOpenAICompletionResponse['choices'][0]['message']>;
 };
 
 export class OpenAI {
@@ -43,9 +43,7 @@ export class OpenAI {
         IOpenAICompletionResponse
     >;
 
-    constructor(private readonly app: KokoApp) {
-        this.http = this.app.getAccessors()?.http;
-    }
+    constructor(private readonly app: KokoApp) {}
 
     public refreshCofiguration({
         token,
@@ -82,10 +80,12 @@ export class OpenAI {
 
         const completionUrl = 'https://api.openai.com/v1/chat/completions';
 
-        const response = await this.http.post(completionUrl, {
-            headers: this.headers,
-            data: body,
-        });
+        const response = await this.app
+            .getAccessors()
+            ?.http.post(completionUrl, {
+                headers: this.headers,
+                data: body,
+            });
 
         return response;
     }
