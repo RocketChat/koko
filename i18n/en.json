@@ -8,5 +8,7 @@
     "Koko_Post_Praise_Room_Name": "Praise Room Name",
     "Koko_Post_Praise_Room_Name_Description": "The room name for Koko to post praises to",
     "Koko_Post_Answers_Room_Name": "Answers Room Name",
-    "Koko_Post_Answers_Room_Name_Description": "The room name for Koko to post answers to"
+    "Koko_Post_Answers_Room_Name_Description": "The room name for Koko to post answers to",
+    "AllStars_Webhook": "AllStars Webhook",
+    "AllStars_Webhook_Description": "Webhook to add Rocket.Chat AllStars points"
 }

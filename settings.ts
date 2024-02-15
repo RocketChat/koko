@@ -36,4 +36,13 @@ export const settings: Array<ISetting> = [
         i18nLabel: 'Koko_Bot_Username',
         i18nDescription: 'Koko_Bot_Username_Description',
     },
+    {
+        id: 'AllStars_Webhook',
+        type: SettingType.STRING,
+        packageValue: '',
+        required: false,
+        public: false,
+        i18nLabel: 'AllStars_Webhook',
+        i18nDescription: 'AllStars_Webhook_Description',
+    },
 ];

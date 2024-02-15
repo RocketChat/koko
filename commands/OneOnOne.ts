@@ -1,4 +1,4 @@
-import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { SlashCommandContext } from '@rocket.chat/apps-engine/definition/slashcommands';
@@ -7,7 +7,7 @@ import { getDirect } from '../lib/helpers';
 import { IListenStorage } from '../storage/IListenStorage';
 
 // tslint:disable-next-line:max-line-length
-export async function processOneOnOneCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, params?: Array<string>): Promise<void> {
+export async function processOneOnOneCommand(app: KokoApp, context: SlashCommandContext, read: IRead, modify: IModify, persistence: IPersistence, http: IHttp, params?: Array<string>): Promise<void> {
     const sender = context.getSender();
     if (params && params.length > 0 && params[0].trim()) {
         const subcommand = params.shift() as string | boolean;
@@ -24,5 +24,5 @@ export async function processOneOnOneCommand(app: KokoApp, context: SlashCommand
     persistence.updateByAssociation(assoc, listen, true);
 
     // Puts user on the waiting list or matches with whoever is waiting
-    await app.kokoOneOnOne.answer(read, modify, persistence, sender, room, listen, 'Yes');
+    await app.kokoOneOnOne.answer(read, modify, persistence, sender, room, listen, 'Yes', http);
 }

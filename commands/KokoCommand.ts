@@ -51,7 +51,7 @@ export class KokoCommand implements ISlashCommand {
                 break;
             case this.CommandEnum.OneOnOne:
             case this.CommandEnum.OneOnOneNumeral:
-                await processOneOnOneCommand(this.app, context, read, modify, persistence, params);
+                await processOneOnOneCommand(this.app, context, read, modify, persistence, http, params);
                 break;
             case this.CommandEnum.Cancel:
                 await processCancelCommand(this.app, context, read, modify, persistence);

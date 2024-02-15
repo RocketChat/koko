@@ -1,4 +1,4 @@
-import { IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
+import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
@@ -53,7 +53,7 @@ export class KokoValues {
      * Then sends a praise to the selected users
      */
     // tslint:disable-next-line:max-line-length
-    public async submit({ context, modify, read, persistence }: { context: UIKitViewSubmitInteractionContext, modify: IModify, read: IRead, persistence: IPersistence }) {
+    public async submit({ context, modify, read, persistence, http }: { context: UIKitViewSubmitInteractionContext, modify: IModify, read: IRead, persistence: IPersistence, http: IHttp }) {
         const data = context.getInteractionData();
         const { values }: {
             values: {
@@ -75,7 +75,7 @@ export class KokoValues {
                 errors,
             });
         }
-        await this.sendValuesAnswer(read, modify, persistence, data.user, values.dots, values.reason, values.who);
+        await this.sendValuesAnswer(read, modify, persistence, data.user, http, values.dots, values.reason, values.who);
         const modal = await valuesRegisteredModal({ read, modify, data });
         return context.getInteractionResponder().updateModalViewResponse(modal);
     }
@@ -89,7 +89,7 @@ export class KokoValues {
      * @param read IRead
      * @param modify IModify
      */
-    private async sendValuesAnswer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, dots: Array<string>, text: string, usernames?: Array<string>) {
+    private async sendValuesAnswer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, http: IHttp, dots: Array<string>, text: string, usernames?: Array<string>) {
         console.log(sender, dots, text);
         const valuePointsAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'valuePoints');
         const valuePointsData = await read.getPersistenceReader().readByAssociation(valuePointsAssoc);
@@ -129,7 +129,24 @@ export class KokoValues {
         }
         values.push(valueAnswer);
         await persistence.updateByAssociation(valuesAssoc, values);
-
+        const monthlyValuesAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'monthlyValues');
+        const monhtlyValuesData = await read.getPersistenceReader().readByAssociation(monthlyValuesAssoc);
+        let monthlyValues = monhtlyValuesData && monhtlyValuesData.length > 0 && monhtlyValuesData[0];
+        if (!monthlyValues) {
+            monthlyValues = {};
+        }
+        const yearMonth = new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2);
+        if (!monthlyValues[yearMonth]) {
+            monthlyValues[yearMonth] = [];
+        }
+        if (monthlyValues[yearMonth].indexOf(sender.username) === -1) {
+            monthlyValues[yearMonth].push(sender.username);
+            await persistence.updateByAssociation(monthlyValuesAssoc, monthlyValues);
+            const webhookUrl = await read.getEnvironmentReader().getSettings().getValueById('AllStars_Webhook');
+            if (sender.username && webhookUrl) {
+                await http.post(webhookUrl, { data: { username: sender.username, type: 'Koko Values' } });
+            }
+        }
         let msg;
         let replaceUsernames;
         if (usernames === undefined || usernames.length === 0) {

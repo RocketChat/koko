@@ -106,14 +106,34 @@ export class KokoOneOnOne {
      * @param text the message to get username or praise from
      */
     // tslint:disable-next-line:max-line-length
-    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, data: IListenStorage, text: string) {
+    public async answer(read: IRead, modify: IModify, persistence: IPersistence, sender: IUser, room: IRoom, data: IListenStorage, text: string, http: IHttp) {
         if (data.listen === 'one-on-one') {
             // Removes listening status for user
             const association = new RocketChatAssociationRecord(RocketChatAssociationModel.USER, sender.id);
             persistence.removeByAssociation(association);
 
             if (text === 'Yes') {
-                // Checks if user if first or last in the call
+                const monhtlyStatsAssoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one-monthly-stats');
+                const monthlyStatsData = await read.getPersistenceReader().readByAssociation(monhtlyStatsAssoc);
+                let monthlyStats = monthlyStatsData && monthlyStatsData.length > 0 && monthlyStatsData[0];
+                if (!monthlyStats) {
+                    monthlyStats = {};
+                }
+                const yearMonth = new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2);
+                if (!monthlyStats[yearMonth]) {
+                    monthlyStats[yearMonth] = [];
+                }
+                if (monthlyStats[yearMonth].indexOf(sender.username) === -1) {
+                    monthlyStats[yearMonth].push(sender.username);
+                    const webhookUrl = await read.getEnvironmentReader().getSettings().getValueById('AllStars_Webhook');
+                    if (sender.username && webhookUrl) {
+                        await http.post(webhookUrl, { data: { username: sender.username, type: 'Koko 1-1' } });
+                    }
+                }
+                await persistence.updateByAssociation(monhtlyStatsAssoc, monthlyStats);
+                
+
+                // Checks if user is first or last in the call
                 const oneOnOneAssociation = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, 'one-on-one');
                 const oneOnOneData = await read.getPersistenceReader().readByAssociation(oneOnOneAssociation);
                 if (oneOnOneData && oneOnOneData.length > 0 && oneOnOneData[0]) {
