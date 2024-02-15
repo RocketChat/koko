@@ -94,27 +94,27 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
      * The praise mechanism
      */
-    public readonly kokoPraise: KokoPraise;
+    public kokoPraise: KokoPraise;
 
     /**
      * The question mechanism
      */
-    public readonly kokoQuestion: KokoQuestion;
+    public kokoQuestion: KokoQuestion;
 
     /**
      * The values mechanism
      */
-    public readonly kokoValues: KokoValues;
+    public kokoValues: KokoValues;
 
     /**
      * The random one on one mechanism
      */
-    public readonly kokoOneOnOne: KokoOneOnOne;
+    public kokoOneOnOne: KokoOneOnOne;
 
     /**
      * The wellness mechanism
      */
-    public readonly kokoWellness: KokoWellness;
+    public kokoWellness: KokoWellness;
 
     /**
      * Members cache
@@ -124,11 +124,6 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
-        this.kokoPraise = new KokoPraise(this);
-        this.kokoQuestion = new KokoQuestion(this);
-        this.kokoOneOnOne = new KokoOneOnOne(this);
-        this.kokoWellness = new KokoWellness(this);
-        this.kokoValues = new KokoValues(this);
     }
 
     /**
@@ -175,6 +170,16 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         return {
             success: true,
         };
+    }
+
+    public async initialize(configurationExtend: IConfigurationExtend, environmentRead: IEnvironmentRead): Promise<void> {
+        this.kokoPraise = new KokoPraise(this);
+        this.kokoQuestion = new KokoQuestion(this);
+        this.kokoOneOnOne = new KokoOneOnOne(this);
+        this.kokoWellness = new KokoWellness(this);
+        this.kokoValues = new KokoValues(this);
+
+        await this.extendConfiguration(configurationExtend);
     }
 
     /**
