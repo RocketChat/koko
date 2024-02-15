@@ -178,6 +178,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoOneOnOne = new KokoOneOnOne(this);
         this.kokoWellness = new KokoWellness(this);
         this.kokoValues = new KokoValues(this);
+
+        await this.extendConfiguration(configurationExtend);
     }
 
     /**
