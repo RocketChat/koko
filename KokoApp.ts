@@ -303,7 +303,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 id: 'one-on-one',
                 startupSetting: {
                     type: StartupType.RECURRING,
-                    interval: '0 17 * * 2',
+                    interval: '0 17 * * 4',
                     data: { appId: this.getID() },
                 },
                 processor: async (jobContext, read, modify, http, persistence) => {
