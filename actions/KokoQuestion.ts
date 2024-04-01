@@ -16,6 +16,14 @@ export class KokoQuestion {
     // List of questions based on https://conversationstartersworld.com and https://reddit.com/r/askreddit
     private questions = [
         'Among your friends or family, what are you famous for?',
+        'What do you believe is the key to fostering a positive and inclusive team culture, and how can we work together to promote it?',
+        'Can you describe a project or task where you felt particularly proud of our team\'s collaboration and results?',
+        'How do you prefer to receive feedback from team members?',
+        'What strategies do you use to stay motivated and productive when working on team projects, especially during challenging times?',
+        'In your opinion, what is the most important aspect of effective communication within a team?',
+        'If you could implement one new policy or change in our team\'s workflow, what would it be and why?',
+        'What do you think are the most important qualities for effective teamwork?',
+        'In your opinion, what is the biggest challenge facing our team right now, and how do you propose we address it?',
         'An app mysteriously appears on your phone that does something amazing. What does it do?',
         'An epic feast is held in your honor, what\'s on the table?',
         'Are all individuals morally obligated to save another person\'s life if they are able? What if that person lives in another country?',
