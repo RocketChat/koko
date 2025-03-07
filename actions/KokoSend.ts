@@ -6,10 +6,9 @@ import {
 } from "@rocket.chat/apps-engine/definition/accessors";
 import { IRoom } from "@rocket.chat/apps-engine/definition/rooms";
 import { UIKitViewSubmitInteractionContext } from "@rocket.chat/apps-engine/definition/uikit";
-import { IUser } from "@rocket.chat/apps-engine/definition/users";
 
 import { KokoApp } from "../KokoApp";
-import { getDirect, notifyUser, sendMessage } from "../lib/helpers";
+import { getDirect, sendMessage } from "../lib/helpers";
 import { messageSubmittedModal } from "../modals/SendModal";
 
 export class KokoSend {
@@ -17,7 +16,7 @@ export class KokoSend {
 
     /**
      * Handles the submit action for the Send Message modal
-     * Sends a message to the specified room
+     * Validates input and sends message to the specified room or user
      */
     public async submit({
         context,
@@ -33,91 +32,107 @@ export class KokoSend {
         http: IHttp;
     }) {
         const data = context.getInteractionData();
-        let roomToSend: IRoom | undefined;
-
-        // Extract data from the modal submission
         const { send } = data.view.state as any;
+
+        // Extract and validate message content
         const messageToSend = send?.["message"];
-        const roomNameInput = send?.["room"];
-        const roomNameUser = send?.["user"];
-
-        // Validate inputs
-        const errors = {} as any;
-
-        if (!messageToSend || messageToSend.trim().length === 0) {
-            errors["message"] = "Please enter a message to send";
-        }
-
-        const roomName =
-            roomNameInput?.trim() || roomNameUser?.trim() || undefined;
-        if (!roomName) {
-            errors["room"] = "Please enter a room name";
-        } else if (roomName.startsWith("#")) {
-            // Check if the room exists
-            const room = await read
-                .getRoomReader()
-                .getByName(roomName.replace("#", ""));
-            if (!room) {
-                errors["room"] = `Room "${roomName}" not found`;
-            } else {
-                roomToSend = room;
-            }
-        } else if (roomName.startsWith("@")) {
-            // Check if the user exists
-            const user = await read
-                .getUserReader()
-                .getByUsername(roomName.replace("@", ""));
-
-            if (!user) {
-                errors["user"] = `User "${roomName}" not found`;
-            } else {
-                roomToSend = await getDirect(
-                    this.app,
-                    read,
-                    modify,
-                    roomName.replace("@", "")
-                );
-            }
-        }
-
-        // Return errors if validation fails
-        if (Object.keys(errors).length > 0) {
+        if (!messageToSend?.trim()) {
             return context.getInteractionResponder().viewErrorResponse({
                 viewId: data.view.id,
-                errors,
+                errors: {
+                    message: "Please enter a message to send",
+                },
             });
         }
 
-        // Send the message
-        await sendMessage(this.app, modify, roomToSend as IRoom, messageToSend);
+        // Determine target room (channel or user)
+        const roomNameInput = send?.["room"];
+        const roomNameUser = send?.["user"];
+        const roomName = roomNameInput?.trim() || roomNameUser?.trim();
 
-        // Show confirmation modal
-        const modal = await messageSubmittedModal({ read, modify, data });
-        return context.getInteractionResponder().updateModalViewResponse(modal);
+        // Validate room name
+        if (!roomName) {
+            return context.getInteractionResponder().viewErrorResponse({
+                viewId: data.view.id,
+                errors: {
+                    room: "Please enter a valid room or user name",
+                },
+            });
+        }
+
+        // Find target room
+        try {
+            const targetRoom = await this.resolveTargetRoom(
+                read,
+                modify,
+                roomName
+            );
+
+            if (!targetRoom) {
+                const fieldName = roomName.startsWith("@") ? "user" : "room";
+                const entityType = roomName.startsWith("@") ? "User" : "Room";
+
+                return context.getInteractionResponder().viewErrorResponse({
+                    viewId: data.view.id,
+                    errors: {
+                        [fieldName]: `${entityType} "${roomName}" not found. Please check the name and try again.`,
+                    },
+                });
+            }
+
+            // Send the message
+            await sendMessage(this.app, modify, targetRoom, messageToSend);
+
+            // Show confirmation modal
+            const modal = await messageSubmittedModal({ read, modify, data });
+            return context
+                .getInteractionResponder()
+                .updateModalViewResponse(modal);
+        } catch (error) {
+            // Handle errors during room resolution or message sending
+            this.app
+                .getLogger()
+                .error(`Error in send command: ${error.message}`);
+
+            return context.getInteractionResponder().viewErrorResponse({
+                viewId: data.view.id,
+                errors: {
+                    message:
+                        "An error occurred while sending your message. Please try again.",
+                },
+            });
+        }
     }
 
     /**
-     * Gets the direct message room between the user and the bot
+     * Resolves a room name or username to an actual room object
      *
-     * @param {IRead} read - The IRead instance
-     * @param {IUser} user - The user to get the direct message room for
-     * @param {IRoom} room - The room to get the direct message room for
-     * @return {Promise<IRoom>} - The direct message room
-     * @throws {Error} - If the direct message room is not found
+     * @param {IRead} read - The read accessor
+     * @param {IModify} modify - The modify accessor
+     * @param {string} target - The target room name or username (with # or @ prefix)
+     * @returns {Promise<IRoom|undefined>} The resolved room or undefined if not found
      */
-    private async getDirectRoom(
+    private async resolveTargetRoom(
         read: IRead,
-        user: IUser,
-        room: IRoom
-    ): Promise<IRoom> {
-        // const directRoom = await getDirect(this.app, read, user, room);
+        modify: IModify,
+        target: string
+    ): Promise<IRoom | undefined> {
+        // Handle channel
+        if (target.startsWith("#")) {
+            const roomName = target.substring(1); // Remove # prefix
+            return read.getRoomReader().getByName(roomName);
+        }
 
-        // // Check if the direct room exists
-        // if (!directRoom) {
-        //     throw new Error(`Direct message room not found`);
-        // }
+        // Handle user
+        if (target.startsWith("@")) {
+            const username = target.substring(1); // Remove @ prefix
+            const user = await read.getUserReader().getByUsername(username);
 
-        // return directRoom;
-        return room;
+            if (user) {
+                return getDirect(this.app, read, modify, username);
+            }
+        }
+
+        return undefined;
     }
 }
