@@ -39,6 +39,7 @@ import { praiseModal } from './modals/PraiseModal';
 import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
+import { KokoSend } from './actions/KokoSend';
 
 export class KokoApp extends App implements IUIKitInteractionHandler {
     /**
@@ -117,6 +118,11 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     public kokoWellness: KokoWellness;
 
     /**
+     * The send message mechanism
+     */
+    public kokoSend: KokoSend;
+
+    /**
      * Members cache
      */
     // tslint:disable-next-line:variable-name
@@ -138,6 +144,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                 return this.kokoQuestion.submit({ context, modify, read, persistence });
             case 'values':
                 return this.kokoValues.submit({ context, modify, read, persistence, http });
+            case 'send':
+                return this.kokoSend.submit({ context, modify, read, persistence, http });
         }
         return {
             success: true,
@@ -178,6 +186,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         this.kokoOneOnOne = new KokoOneOnOne(this);
         this.kokoWellness = new KokoWellness(this);
         this.kokoValues = new KokoValues(this);
+        this.kokoSend = new KokoSend(this);
 
         await this.extendConfiguration(configurationExtend);
     }

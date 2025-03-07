@@ -10,5 +10,7 @@
     "Koko_Post_Answers_Room_Name": "Answers Room Name",
     "Koko_Post_Answers_Room_Name_Description": "The room name for Koko to post answers to",
     "AllStars_Webhook": "AllStars Webhook",
-    "AllStars_Webhook_Description": "Webhook to add Rocket.Chat AllStars points"
+    "AllStars_Webhook_Description": "Webhook to add Rocket.Chat AllStars points",
+    "Access_Roles": "Access Roles",
+    "Access_Roles_Description": "Roles that can manage Koko. Case sensitive, comma separated"
 }
