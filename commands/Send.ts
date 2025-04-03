@@ -6,7 +6,7 @@ import {
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { KokoApp } from "../KokoApp";
 import { sendModal } from "../modals/SendModal";
-import { notifyUser } from "../lib/helpers";
+import { hasValidRole, notifyUser } from "../lib/helpers";
 
 /**
  * Processes a send command and opens a modal for message composition
@@ -29,6 +29,22 @@ export const processSendCommand = async (
 ): Promise<void> => {
     const sender = context.getSender();
     const room = context.getRoom();
+
+    // Check if the sender has valid roles
+    if (!(await hasValidRole(read, sender.roles, app.managerRolesMap))) {
+        // Log the availability of roles
+        app.getLogger().log(
+            `Allowed roles: ${Array.from(app.managerRolesMap.values())}`
+        );
+        await notifyUser(
+            app,
+            modify,
+            room,
+            sender,
+            "You do not have permission to use this command. If you believe this is an error, please contact your administrator."
+        );
+        return;
+    } 
 
     // Validate target room/user parameter
     if (args.length < 1) {

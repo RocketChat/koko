@@ -128,6 +128,8 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
     // tslint:disable-next-line:variable-name
     private _membersCache: MembersCache;
 
+    public managerRolesMap: Map<string, string> = new Map();
+
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
         super(info, logger, accessors);
     }
@@ -216,6 +218,12 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
         if (this.botUsername) {
             this.botUser = await this.getAccessors().reader.getUserReader().getByUsername(this.botUsername) as IUser;
         }
+
+        // Reconfigure the managerRolesMap
+        const accessRolesSetting = await environmentRead.getSettings().getValueById('Access_Roles');
+        if (accessRolesSetting) {
+            await this.updateRolesMap(accessRolesSetting, this.getAccessors().reader);
+        }
         return true;
     }
 
@@ -253,6 +261,10 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
                     this.botUser = await read.getUserReader().getByUsername(this.botUsername) as IUser;
                 }
                 break;
+            case 'Access_Roles': {
+                await this.updateRolesMap(setting.value, read);
+                break;
+            }
         }
     }
 
@@ -350,5 +362,37 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 
     set membersCache(memberCache: MembersCache) {
         this._membersCache = memberCache;
+    }
+
+    /**
+     * Helper to update roles map based on a setting value
+     */
+    private async updateRolesMap(rolesString: string, read: IRead): Promise<void> {
+        const roles = rolesString.split(',').map((role) => role.trim());
+        if (roles.length === 0) {
+            this.getLogger().warn('No roles provided in the Access_Roles setting.');
+            return;
+        }
+
+        // Clear the previous roles
+        this.managerRolesMap.clear();
+        this.getLogger().info('Cleared existing manager roles map.');
+
+        // Populate the roles map
+        for (const role of roles) {
+            try {
+                const roleDetails = await read.getRoleReader().getOneByIdOrName(role, this.getID());
+                if (roleDetails) {
+                    this.managerRolesMap.set(roleDetails.id, roleDetails.name);
+                    this.getLogger().info(`Role added: ${roleDetails.name} (ID: ${roleDetails.id})`);
+                } else {
+                    this.getLogger().warn(`Role not found: ${role}`);
+                }
+            } catch (error) {
+                this.getLogger().error(`Error fetching role details for "${role}": ${error.message}`);
+            }
+        }
+
+        this.getLogger().info(`Manager roles map updated with ${this.managerRolesMap.size} roles.`);
     }
 }

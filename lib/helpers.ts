@@ -138,3 +138,26 @@ export async function notifyUser(app: KokoApp, modify: IModify, room: IRoom, use
         app.getLogger().log(error);
     }
 }
+
+/**
+     * Checks if a user has at least one of the required roles.
+     * @param read - The IRead instance to access the environment settings.
+     * @param roles - The roles to check against the allowed roles.
+     * @returns {boolean} - True if the user has one of the allowed roles, otherwise false.
+     */
+export const hasValidRole = async (
+    read: IRead,
+    roles: string[],
+    allowedRoles: Map<string, string>
+): Promise<boolean> => {
+
+    // Check if the user has at least one of the allowed roles
+    for (const role of roles) {
+        if (allowedRoles.has(role)) {
+            return true;
+        }
+    }
+
+    // If no allowed roles are found, return false
+    return false;
+}
