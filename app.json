@@ -1,7 +1,7 @@
 {
     "id": "b9970f61-06ac-46e4-ade3-3b0f0c667739",
     "version": "1.0.4",
-    "requiredApiVersion": "^1.21.0",
+    "requiredApiVersion": "^1.49.0",
     "iconFile": "icon.png",
     "author": {
         "name": "Marcelo Schmidt",
@@ -14,5 +14,40 @@
     "description": "Rocket.Chat Koko Bot",
     "implements": [
         "IUIKitInteractionHandler"
+    ],
+    "permissions": [
+        {
+            "name": "role.read"
+        },
+        {
+            "name": "api"
+        },
+        {
+            "name": "scheduler"
+        },
+        {
+            "name": "slashcommand"
+        },
+        {
+            "name": "room.read"
+        },
+        {
+            "name": "room.write"
+        },
+        {
+            "name": "message.read"
+        },
+        {
+            "name": "message.write"
+        },
+        {
+            "name": "user.read"
+        },
+        {
+            "name": "user.write"
+        },
+        {
+            "name": "ui.interact"
+        }
     ]
 }
