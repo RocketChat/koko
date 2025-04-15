@@ -3,15 +3,22 @@ import { ApiEndpoint, IApiEndpointInfo, IApiRequest, IApiResponse } from '@rocke
 import { KokoApp } from '../KokoApp';
 
 export class QuestionEndpoint extends ApiEndpoint {
-    public path: string = 'question';
+	public path: string = 'question';
 
-    constructor(public app: KokoApp) {
-        super(app);
-    }
+	constructor(public app: KokoApp) {
+		super(app);
+	}
 
-    // tslint:disable-next-line:max-line-length
-    public async post(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        this.app.kokoQuestion.run(read, modify, persistence);
-        return this.success();
-    }
+	// tslint:disable-next-line:max-line-length
+	public async post(
+		request: IApiRequest,
+		endpoint: IApiEndpointInfo,
+		read: IRead,
+		modify: IModify,
+		http: IHttp,
+		persistence: IPersistence,
+	): Promise<IApiResponse> {
+		this.app.kokoQuestion.run(read, modify, persistence);
+		return this.success();
+	}
 }

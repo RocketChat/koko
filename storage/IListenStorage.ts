@@ -5,6 +5,6 @@
  * Username: username being praised
  */
 export interface IListenStorage {
-    listen: string;
-    username?: string;
+	listen: string;
+	username?: string;
 }
