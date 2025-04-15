@@ -53,14 +53,13 @@ export const processSendCommand = async (
             modify,
             room,
             sender,
-            "Please specify a target: `/koko send #channel` or `/koko send @username`"
+            "💡 Tip: Next time, use `/koko send @username` or `/koko send #channel` to pre-fill the target using autocomplete."
         );
-        return;
     }
 
     // Extract and validate room name format
-    const roomName = args[0].trim();
-    if (!roomName.startsWith("#") && !roomName.startsWith("@")) {
+    const roomName = args[0]?.trim();
+    if (roomName && !roomName.startsWith("#") && !roomName.startsWith("@")) {
         await notifyUser(
             app,
             modify,
