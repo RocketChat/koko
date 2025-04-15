@@ -26,36 +26,24 @@ export async function sendModal({
     const block = modify.getCreator().getBlockBuilder();
     const { roomName }: { roomName: string } = data;
 
-    if (roomName.startsWith("#")) {
-        block.addInputBlock({
-            blockId: UI_ID,
-            element: block.newPlainTextInputElement({
-                actionId: "room",
-                initialValue: roomName,
-                multiline: false,
-            }),
-            label: {
+    block.addInputBlock({
+        blockId: UI_ID,
+        element: block.newPlainTextInputElement({
+            actionId: "target",
+            initialValue: roomName,
+            multiline: false,
+            placeholder: {
                 type: TextObjectType.PLAINTEXT,
-                text: "Send to Channel",
-                emoji: true,
-            },
-        });
-    }
-    if (roomName.startsWith("@")) {
-        block.addInputBlock({
-            blockId: UI_ID,
-            element: block.newPlainTextInputElement({
-                actionId: "user",
-                initialValue: roomName,
-                multiline: false,
-            }),
-            label: {
-                type: TextObjectType.PLAINTEXT,
-                text: "Send to User",
-                emoji: true,
-            },
-        });
-    }
+                text: "Enter a channel name (e.g., #general) or a user name (e.g., @username)",
+            }
+        }),
+        label: {
+            type: TextObjectType.PLAINTEXT,
+            text: "Send to Channel or User",
+            emoji: true,
+        },
+    });
+    
 
     block.addInputBlock({
         blockId: UI_ID,

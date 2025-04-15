@@ -46,16 +46,15 @@ export class KokoSend {
         }
 
         // Determine target room (channel or user)
-        const roomNameInput = send?.["room"];
-        const roomNameUser = send?.["user"];
-        const roomName = roomNameInput?.trim() || roomNameUser?.trim();
+        const target = send?.["target"];
+        const roomName = target?.trim();
 
         // Validate room name
         if (!roomName) {
             return context.getInteractionResponder().viewErrorResponse({
                 viewId: data.view.id,
                 errors: {
-                    room: "Please enter a valid room or user name",
+                    target: "Please enter a valid room or user name",
                 },
             });
         }
@@ -69,13 +68,12 @@ export class KokoSend {
             );
 
             if (!targetRoom) {
-                const fieldName = roomName.startsWith("@") ? "user" : "room";
                 const entityType = roomName.startsWith("@") ? "User" : "Room";
 
                 return context.getInteractionResponder().viewErrorResponse({
                     viewId: data.view.id,
                     errors: {
-                        [fieldName]: `${entityType} "${roomName}" not found. Please check the name and try again.`,
+                        "target": `${entityType} "${roomName}" not found. Please check the name and try again.`,
                     },
                 });
             }
