@@ -50,11 +50,11 @@ export class KokoSend {
         const roomName = target?.trim();
 
         // Validate room name
-        if (!roomName) {
+        if (!roomName || !roomName.match(/^(#|@)[a-zA-Z0-9_.-]+$/)) {
             return context.getInteractionResponder().viewErrorResponse({
                 viewId: data.view.id,
                 errors: {
-                    target: "Please enter a valid room or user name",
+                    target: "Please enter a valid channel name (e.g., #general) or a user name (e.g., @username)",
                 },
             });
         }
