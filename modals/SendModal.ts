@@ -117,6 +117,7 @@ export async function messageSubmittedModal({
             type: TextObjectType.PLAINTEXT,
             text: "Message Sent",
         },
+        submit: undefined,
         close: block.newButtonElement({
             text: {
                 type: TextObjectType.PLAINTEXT,
