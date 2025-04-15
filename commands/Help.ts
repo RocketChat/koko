@@ -12,6 +12,7 @@ export async function processHelpCommand(app: KokoApp, context: SlashCommandCont
         \`/koko praise\` Starts a new praise message
         \`/koko question\` Repeats last question allowing you to change your answer
         \`/koko 1:1 (or one-on-one)\` Adds user to the random one-on-one waiting list
+        \`/koko send\` Starts a new message to a user or channel
         \---
         \`/koko cancel\` Cancels all operations with current user
         \`/koko help\` Shows this message`;

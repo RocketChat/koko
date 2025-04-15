@@ -45,4 +45,13 @@ export const settings: Array<ISetting> = [
         i18nLabel: 'AllStars_Webhook',
         i18nDescription: 'AllStars_Webhook_Description',
     },
+    {
+        id: 'Access_Roles',
+        type: SettingType.STRING,
+        packageValue: '',
+        required: false,
+        public: false,
+        i18nLabel: 'Access_Roles',
+        i18nDescription: 'Access_Roles_Description',
+    }
 ];
