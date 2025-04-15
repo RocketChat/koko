@@ -4,15 +4,29 @@ import { KokoApp } from '../KokoApp';
 import { random } from '../lib/helpers';
 
 export class PraiseEndpoint extends ApiEndpoint {
-    public path: string = 'praise';
+	public path: string = 'praise';
 
-    constructor(public app: KokoApp) {
-        super(app);
-    }
+	constructor(public app: KokoApp) {
+		super(app);
+	}
 
-    // tslint:disable-next-line:max-line-length
-    public async post(request: IApiRequest, endpoint: IApiEndpointInfo, read: IRead, modify: IModify, http: IHttp, persistence: IPersistence): Promise<IApiResponse> {
-        this.app.kokoPraise.run(read, modify, persistence, undefined, request.query?.text, request.query?.sendScoreBoard);
-        return this.success();
-    }
+	// tslint:disable-next-line:max-line-length
+	public async post(
+		request: IApiRequest,
+		endpoint: IApiEndpointInfo,
+		read: IRead,
+		modify: IModify,
+		http: IHttp,
+		persistence: IPersistence,
+	): Promise<IApiResponse> {
+		this.app.kokoPraise.run(
+			read,
+			modify,
+			persistence,
+			undefined,
+			request.query?.text,
+			request.query?.sendScoreBoard,
+		);
+		return this.success();
+	}
 }
