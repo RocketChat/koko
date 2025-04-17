@@ -40,6 +40,7 @@ import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 import { KokoSend } from './actions/KokoSend';
+import { KokoAskQuestion } from './actions/KokoAskQuestion';
 
 export class KokoApp extends App implements IUIKitInteractionHandler {
 	/**
@@ -103,6 +104,11 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 	public kokoQuestion: KokoQuestion;
 
 	/**
+	 * The question ask mechanism
+	 */
+	public kokoQuestionAsk: KokoAskQuestion;
+
+	/**
 	 * The values mechanism
 	 */
 	public kokoValues: KokoValues;
@@ -154,6 +160,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 				return this.kokoValues.submit({ context, modify, read, persistence, http });
 			case 'send':
 				return this.kokoSend.submit({ context, modify, read, persistence, http });
+			case 'question-ask-modal':
+				return this.kokoQuestionAsk.submit({
+					context,
+					modify,
+					read,
+					persistence,
+					http,
+				});
 		}
 		return {
 			success: true,
@@ -204,6 +218,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 		this.kokoWellness = new KokoWellness(this);
 		this.kokoValues = new KokoValues(this);
 		this.kokoSend = new KokoSend(this);
+		this.kokoQuestionAsk = new KokoAskQuestion(this);
 
 		await this.extendConfiguration(configurationExtend);
 	}
