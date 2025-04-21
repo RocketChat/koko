@@ -6,3 +6,12 @@ export type QuestionPayload = {
 	msgIds: string[];
 	state: 'pending' | 'sent' | 'closed';
 };
+
+export type ResponsePayload = {
+	response: string;
+	questionId: string;
+	questionText: string;
+	userId: string;
+	roomId: string;
+	msgId: string;
+};

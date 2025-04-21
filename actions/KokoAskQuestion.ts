@@ -8,7 +8,7 @@ import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, sendMessage } from '../lib/helpers';
 import { questionSubmittedModal } from '../modals/QuestionAskModal';
 import { createQuestionBlocks } from '../blocks/QuestionBlocks';
-import { QuestionPayload } from '../types/AskQuestion';
+import { QuestionPayload, ResponsePayload } from '../types/AskQuestion';
 
 export class KokoAskQuestion {
 	constructor(private readonly app: KokoApp) {}
@@ -178,6 +178,14 @@ export class KokoAskQuestion {
 			saved.msgIds = messageIds;
 			saved.state = 'sent';
 			await persistence.updateByAssociation(assoc, saved, true);
+
+			const postCollectionDate = new Date(collectionDate);
+
+			await modify.getScheduler().scheduleOnce({
+				id: 'post-answers',
+				when: postCollectionDate,
+				data: { questionAssocId },
+			});
 		} catch (err) {
 			this.app.getLogger().error(`Error in ask-question processor: ${err.message}`);
 		}
@@ -198,6 +206,89 @@ export class KokoAskQuestion {
 		} catch (error) {
 			this.app.getLogger().error(`Error collecting responses: ${error.message}`);
 			return null;
+		}
+	}
+
+	/**
+	 * Scheduler processor for "post-answers":
+	 *  1) Load the QuestionPayload, including saved.msgIds[]
+	 *  2) For each thread (msgId) fetch all replies
+	 *  3) Build a per‑reply link: https://<server>/direct/<roomId>?msg=<msgId>
+	 *  4) Post into your configured answers room: first the question, then all links in a thread
+	 */
+	public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence, questionAssocId: string) {
+		try {
+			// Load question record
+			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
+			const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
+			if (!saved) {
+				throw new Error(`postAnswers: no question for ${questionAssocId}`);
+			}
+
+			const { text: questionText, msgIds } = saved;
+			if (!msgIds || msgIds.length === 0) {
+				throw new Error(`postAnswers: no msgIds to collect from`);
+			}
+
+			// Grab server URL and the answer room name from settings
+			const serverUrl = (await read
+				.getEnvironmentReader()
+				.getServerSettings()
+				.getValueById('Site_Url')) as string;
+			const answerRoomName = (await read
+				.getEnvironmentReader()
+				.getSettings()
+				.getValueById('Post_Answers_Room_Name')) as string;
+
+			const answerRoom = await read.getRoomReader().getByName(answerRoomName);
+			if (!answerRoom) {
+				throw new Error(`postAnswers: could not find room "${answerRoomName}"`);
+			}
+
+			const finisher = modify.getCreator();
+
+			// Post the question as a new message in the answers room
+			const first = finisher.startMessage().setRoom(answerRoom).setText(`*Question:* ${questionText}`);
+			const firstId = await finisher.finish(first);
+
+			// For each original question‐msgId, fetch its recorded replies
+			const linkLines: string[] = [];
+			for (const threadId of msgIds) {
+				// read from the persistence
+				const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `response_${threadId}`);
+				console.log('assoc', assoc);
+				const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as ResponsePayload[];
+				if (!saved) {
+					this.app.getLogger().error(`postAnswers: no response for ${threadId}`);
+					continue;
+				}
+				const { roomId: rid, msgId: mid, userId } = saved;
+				const reply = await read.getUserReader().getById(userId);
+				if (!reply) {
+					this.app.getLogger().error(`postAnswers: no user for ${userId}`);
+					continue;
+				}
+				// Build the link to the reply
+				linkLines.push(`• [${reply.username || 'user'}](${serverUrl}/direct/${rid}?msg=${mid})`);
+			}
+
+			if (linkLines.length === 0) {
+				linkLines.push('_No answers submitted._');
+			}
+
+			// Post all of the links as a threaded reply under `firstId`
+			const threadMsg = finisher
+				.startMessage()
+				.setRoom(answerRoom)
+				.setThreadId(firstId)
+				.setText(linkLines.join('\n'));
+			await finisher.finish(threadMsg);
+
+			//  Optionally mark the question "closed" in persistence
+			saved.state = 'closed';
+			await persistence.updateByAssociation(assoc, saved, true);
+		} catch (err) {
+			this.app.getLogger().error(`postAnswers error: ${err.message}`);
 		}
 	}
 }

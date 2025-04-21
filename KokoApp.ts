@@ -43,9 +43,8 @@ import { KokoSend } from './actions/KokoSend';
 import { KokoAskQuestion } from './actions/KokoAskQuestion';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
-import { QuestionPayload } from './types/AskQuestion';
+import { ResponsePayload } from './types/AskQuestion';
 import { AskQuestionHelper } from './lib/AskQuestionHelper';
-import { notifyUser } from './lib/helpers';
 
 export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
 	/**
@@ -418,6 +417,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 					await handler.run(read, modify, persistence, questionAssocId);
 				},
 			},
+			{
+				id: 'post-answers',
+				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
+					const { questionAssocId } = jobContext as { questionAssocId: string };
+					await this.kokoQuestionAsk.postAnswers(read, modify, persistence, questionAssocId);
+				},
+			},
 		]);
 	}
 
@@ -493,19 +499,17 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				return;
 			}
 
+			const responsePayload: ResponsePayload = {
+				response: message.text as string,
+				questionId,
+				questionText: parsedText,
+				userId: message.sender.id,
+				roomId: message.room.id,
+				msgId: message.id as string,
+			};
+
 			// Save the response
-			await persistence.updateByAssociation(
-				responseAssociation,
-				{
-					response: message.text,
-					questionId,
-					questionText: parsedText,
-					userId: message.sender.id,
-					roomId: message.room.id,
-					msgId: message.id,
-				},
-				true,
-			);
+			await persistence.updateByAssociation(responseAssociation, responsePayload, true);
 
 			await read.getNotifier().notifyUser(message.sender, {
 				text: `Your response to the question "${parsedText}" has been saved successfully!`,
