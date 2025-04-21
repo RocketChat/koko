@@ -41,8 +41,13 @@ import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 import { KokoSend } from './actions/KokoSend';
 import { KokoAskQuestion } from './actions/KokoAskQuestion';
+import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
+import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
+import { QuestionPayload } from './types/AskQuestion';
+import { AskQuestionHelper } from './lib/AskQuestionHelper';
+import { notifyUser } from './lib/helpers';
 
-export class KokoApp extends App implements IUIKitInteractionHandler {
+export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
 	/**
 	 * The bot username alias
 	 */
@@ -406,6 +411,86 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 				},
 			},
 		]);
+	}
+
+	async executePostMessageSent(
+		message: IMessage,
+		read: IRead,
+		http: IHttp,
+		persistence: IPersistence,
+		modify: IModify,
+	): Promise<void> {
+		const appUser = await read.getUserReader().getAppUser(this.getID());
+
+		if (!AskQuestionHelper.isMessageIntendedForBot(message, appUser)) {
+			return;
+		}
+
+		try {
+			const parentMessage = await read.getMessageReader().getById(message.threadId as string);
+
+			if (!parentMessage) {
+				this.getLogger().debug('Parent message not found');
+				return;
+			}
+
+			if (!AskQuestionHelper.isParentMessageValid(parentMessage, this.botUser.id)) {
+				this.getLogger().info('Invalid parent message', { parentMessage });
+				return;
+			}
+
+			const parsedText = AskQuestionHelper.parseMessageText(parentMessage.text!);
+
+			const questionId = AskQuestionHelper.generateQuestionId(parsedText);
+
+			const associations = await AskQuestionHelper.getQuestionAssociations(read, questionId);
+
+			const responseAssociation = new RocketChatAssociationRecord(
+				RocketChatAssociationModel.MISC,
+				`response_${parentMessage.id}`,
+			);
+
+			const questionDate = new Date(associations[0]?.collectionDate);
+			if (!questionDate) {
+				this.getLogger().info('No question date found');
+				return;
+			}
+
+			if (AskQuestionHelper.isQuestionExpired(questionDate)) {
+				this.getLogger().info('Question date has passed');
+				return;
+			}
+
+			// Save the response
+			await persistence.updateByAssociation(
+				responseAssociation,
+				{
+					response: message.text,
+					questionId,
+					questionText: parsedText,
+					userId: message.sender.id,
+					roomId: message.room.id,
+					msgId: message.id,
+				},
+				true,
+			);
+
+			await read.getNotifier().notifyUser(message.sender, {
+				text: `Your response to the question "${parsedText}" has been saved successfully!`,
+				room: message.room,
+				sender: this.botUser,
+				alias: this.kokoName,
+				emoji: this.kokoEmojiAvatar,
+				threadId: message.threadId,
+			});
+
+			this.getLogger().debug('Response saved successfully', {
+				questionId,
+				messageId: message.id,
+			});
+		} catch (error) {
+			this.getLogger().error('Error processing message response:', error);
+		}
 	}
 
 	get membersCache(): MembersCache {

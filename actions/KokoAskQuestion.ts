@@ -8,6 +8,7 @@ import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, sendMessage } from '../lib/helpers';
 import { questionSubmittedModal } from '../modals/QuestionAskModal';
 import { createQuestionBlocks } from '../blocks/QuestionBlocks';
+import { QuestionPayload } from '../types/AskQuestion';
 
 export class KokoAskQuestion {
 	constructor(private readonly app: KokoApp) {}
@@ -63,19 +64,22 @@ export class KokoAskQuestion {
 			}
 
 			// Save question to persistence
-			const questionData = {
+			const questionData: QuestionPayload = {
 				text: questionText,
 				collectionDate,
 				askedBy: data.user.id,
 				timestamp: new Date().toISOString(),
+				msgIds: [],
 			};
 
 			// maybe generate a unique hash for the question
-			const questionId = btoa(`${questionText}_${collectionDate}_${data.user.id}`);
+			const questionId = Buffer.from(`${questionText}`, 'utf-8').toString('base64');
 
-			const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionId);
+			const questionAssocId = `question_${questionId}`;
+			const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			await persistence.updateByAssociation(assocQuestion, questionData, true);
 
+			const messageIds: string[] = [];
 			// Send question to each member
 			for (const member of members) {
 				if (member.id === this.app.botUser?.id) {
@@ -92,6 +96,7 @@ export class KokoAskQuestion {
 						hour: 'numeric',
 						minute: 'numeric',
 						timeZone: 'UTC',
+						timeZoneName: 'short',
 					}).format(date);
 				};
 
@@ -113,6 +118,7 @@ export class KokoAskQuestion {
 					// Send the message
 					const msgId = await finisher.finish(msg);
 
+					messageIds.push(msgId);
 					// Second message with formatted deadline info
 					const infoMsg = finisher
 						.startMessage()
@@ -124,6 +130,11 @@ export class KokoAskQuestion {
 					await finisher.finish(infoMsg);
 				}
 			}
+
+			// Store the active question data
+			questionData.msgIds = messageIds;
+
+			await persistence.updateByAssociation(assocQuestion, questionData, true);
 
 			// Show confirmation modal
 			const modal = questionSubmittedModal(this.app.getID(), questionText);

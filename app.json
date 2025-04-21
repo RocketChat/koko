@@ -13,7 +13,8 @@
     "classFile": "KokoApp.ts",
     "description": "Rocket.Chat Koko Bot",
     "implements": [
-        "IUIKitInteractionHandler"
+        "IUIKitInteractionHandler",
+        "IPostMessageSent"
     ],
     "permissions": [
         {
