@@ -51,7 +51,7 @@ export class KokoAskQuestion {
 		}
 
 		try {
-			// 1) Persist the question
+			// Persist the question
 			const questionData: QuestionPayload = {
 				text: questionText,
 				collectionDate,
@@ -71,11 +71,11 @@ export class KokoAskQuestion {
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			await persistence.updateByAssociation(assoc, questionData, true);
 
-			// 2) Schedule a one‑time job at the given date
+			// Schedule a one‑time job at the given date
 			await modify.getScheduler().scheduleOnce({
-				id: 'ask-question', // matches your processor
+				id: 'ask-question',
 				when: new Date(sendTime),
-				data: { questionAssocId }, // so your processor knows which question
+				data: { questionAssocId },
 			});
 
 			// 3) Show confirmation
@@ -98,7 +98,7 @@ export class KokoAskQuestion {
 		}
 
 		try {
-			// 1) Load the saved question
+			// Load the saved question
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
 
@@ -108,7 +108,7 @@ export class KokoAskQuestion {
 
 			const { text: questionText, collectionDate } = saved;
 
-			// 2) Helper to format the deadline
+			// Helper to format the deadline
 			const formatDate = (dateString: string): string => {
 				const date = new Date(dateString);
 				return new Intl.DateTimeFormat('en-US', {
@@ -124,7 +124,7 @@ export class KokoAskQuestion {
 			};
 			const formattedDate = formatDate(collectionDate);
 
-			// 3) Fetch members and send
+			// Fetch members and send
 			const members = await getMembers(this.app, read);
 			const messageIds: string[] = [];
 			const finisher = modify.getCreator();
@@ -138,8 +138,8 @@ export class KokoAskQuestion {
 					continue;
 				}
 
-				// — First, the highlighted question
-				const highlightedText = `*${questionText}*`;
+				// First, the highlighted question
+				const highlightedText = `*${questionText.trim()}*`;
 				const firstMsg = finisher
 					.startMessage()
 					.setSender(this.app.botUser)
@@ -151,7 +151,7 @@ export class KokoAskQuestion {
 				const msgId = await finisher.finish(firstMsg);
 				messageIds.push(msgId);
 
-				// — Then, the deadline/top‐level info (no thread)
+				// Then, the deadline/top‐level info (in thread)
 				const infoMsg = finisher
 					.startMessage()
 					.setSender(this.app.botUser)
@@ -162,7 +162,7 @@ export class KokoAskQuestion {
 				await finisher.finish(infoMsg);
 			}
 
-			// 4) Persist the sent message IDs and mark “sent”
+			// Persist the sent message IDs and mark “sent”
 			saved.msgIds = messageIds;
 			saved.state = 'sent';
 			await persistence.updateByAssociation(assoc, saved, true);
