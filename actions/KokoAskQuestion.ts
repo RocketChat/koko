@@ -13,10 +13,6 @@ import { QuestionPayload } from '../types/AskQuestion';
 export class KokoAskQuestion {
 	constructor(private readonly app: KokoApp) {}
 
-	/**
-	 * Handles the submit action for the Ask Question modal
-	 * Validates input and sends question to all members
-	 */
 	public async submit({
 		context,
 		modify,
@@ -42,11 +38,9 @@ export class KokoAskQuestion {
 			});
 		}
 
-		// Extract values from the correct state structure
-		const questionText = state['question-input-block']?.['question-input-action'];
+		const questionText: string = state['question-input-block']?.['question-input-action'];
 		const collectionDate = state['question-date-block']?.['question-date-action'];
 
-		// Validate question
 		if (!questionText?.trim()) {
 			return context.getInteractionResponder().viewErrorResponse({
 				viewId: data.view.id,
@@ -57,130 +51,123 @@ export class KokoAskQuestion {
 		}
 
 		try {
-			// Get all members
-			const members = await getMembers(this.app, read);
-			if (!members || members.length === 0) {
-				throw new Error('No members found to send the question to');
-			}
-
-			// Save question to persistence
+			// 1) Persist the question
 			const questionData: QuestionPayload = {
 				text: questionText,
 				collectionDate,
 				askedBy: data.user.id,
 				timestamp: new Date().toISOString(),
 				msgIds: [],
+				state: 'pending',
 			};
 
-			// maybe generate a unique hash for the question
-			const questionId = Buffer.from(`${questionText}`, 'utf-8').toString('base64');
+			// send after a minute
+			const sendTime = new Date().setSeconds(new Date().getSeconds() + 10);
+
+			// Encode the question text to create a unique ID
+			const questionId = Buffer.from(questionText?.trim(), 'utf-8').toString('base64');
 
 			const questionAssocId = `question_${questionId}`;
-			const assocQuestion = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
-			await persistence.updateByAssociation(assocQuestion, questionData, true);
+			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
+			await persistence.updateByAssociation(assoc, questionData, true);
 
-			const messageIds: string[] = [];
-			// Send question to each member
-			for (const member of members) {
-				if (member.id === this.app.botUser?.id) {
-					continue;
-				}
+			// 2) Schedule a one‑time job at the given date
+			await modify.getScheduler().scheduleOnce({
+				id: 'ask-question', // matches your processor
+				when: new Date(sendTime),
+				data: { questionAssocId }, // so your processor knows which question
+			});
 
-				const formatDate = (dateString: string): string => {
-					const date = new Date(dateString);
-					return new Intl.DateTimeFormat('en-US', {
-						weekday: 'short',
-						month: 'short',
-						day: 'numeric',
-						year: 'numeric',
-						hour: 'numeric',
-						minute: 'numeric',
-						timeZone: 'UTC',
-						timeZoneName: 'short',
-					}).format(date);
-				};
-
-				const room = await getDirect(this.app, read, modify, member.username);
-				if (room) {
-					const formattedDate = formatDate(collectionDate);
-					const highlightedText = `*${questionText}*`;
-
-					// First message with the question
-					const finisher = modify.getCreator();
-					const msg = finisher
-						.startMessage()
-						.setSender(this.app.botUser)
-						.setUsernameAlias(this.app.kokoName)
-						.setEmojiAvatar(this.app.kokoEmojiAvatar)
-						.setRoom(room)
-						.setText(highlightedText);
-
-					// Send the message
-					const msgId = await finisher.finish(msg);
-
-					messageIds.push(msgId);
-					// Second message with formatted deadline info
-					const infoMsg = finisher
-						.startMessage()
-						.setSender(this.app.botUser)
-						.setRoom(room)
-						.setText(`*Deadline:* ${formattedDate}\nReply in this thread to submit your answer`)
-						.setThreadId(msgId);
-
-					await finisher.finish(infoMsg);
-				}
-			}
-
-			// Store the active question data
-			questionData.msgIds = messageIds;
-
-			await persistence.updateByAssociation(assocQuestion, questionData, true);
-
-			// Show confirmation modal
+			// 3) Show confirmation
 			const modal = questionSubmittedModal(this.app.getID(), questionText);
 			return context.getInteractionResponder().updateModalViewResponse(modal);
-		} catch (error) {
-			this.app.getLogger().error(`Error in ask question command: ${error.message}`);
-
+		} catch (err) {
+			this.app.getLogger().error(`Error scheduling question: ${err.message}`);
 			return context.getInteractionResponder().viewErrorResponse({
 				viewId: data.view.id,
 				errors: {
-					'question-input-block': 'An error occurred while sending your question. Please try again.',
+					'question-input-block': 'An error occurred while scheduling your question. Please try again.',
 				},
 			});
 		}
 	}
 
-	/**
-	 * Broadcasts a question to all members
-	 */
-	public async run(read: IRead, modify: IModify, persistence: IPersistence, question?: string) {
-		if (!this.app.botUser || !this.app.kokoMembersRoom) {
+	public async run(read: IRead, modify: IModify, persistence: IPersistence, questionAssocId: string) {
+		if (!this.app.botUser) {
 			return;
 		}
 
 		try {
-			const members = await getMembers(this.app, read);
-			if (!members || members.length === 0) {
-				throw new Error('No members found to send the question to');
+			// 1) Load the saved question
+			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
+			const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
+
+			if (!saved) {
+				throw new Error(`No question found for ${questionAssocId}`);
 			}
 
-			const questionText = question || 'Default question text';
+			const { text: questionText, collectionDate } = saved;
 
-			// Send question to each member
+			// 2) Helper to format the deadline
+			const formatDate = (dateString: string): string => {
+				const date = new Date(dateString);
+				return new Intl.DateTimeFormat('en-US', {
+					weekday: 'short',
+					month: 'short',
+					day: 'numeric',
+					year: 'numeric',
+					hour: 'numeric',
+					minute: 'numeric',
+					timeZone: 'UTC',
+					timeZoneName: 'short',
+				}).format(date);
+			};
+			const formattedDate = formatDate(collectionDate);
+
+			// 3) Fetch members and send
+			const members = await getMembers(this.app, read);
+			const messageIds: string[] = [];
+			const finisher = modify.getCreator();
+
 			for (const member of members) {
 				if (member.id === this.app.botUser.id) {
 					continue;
 				}
-
 				const room = await getDirect(this.app, read, modify, member.username);
-				if (room) {
-					const blocks = createQuestionBlocks(modify, questionText);
-					await sendMessage(this.app, modify, room, questionText, [], blocks);
+				if (!room) {
+					continue;
 				}
+
+				// — First, the highlighted question
+				const highlightedText = `*${questionText}*`;
+				const firstMsg = finisher
+					.startMessage()
+					.setSender(this.app.botUser)
+					.setUsernameAlias(this.app.kokoName)
+					.setEmojiAvatar(this.app.kokoEmojiAvatar)
+					.setRoom(room)
+					.setText(highlightedText);
+
+				const msgId = await finisher.finish(firstMsg);
+				messageIds.push(msgId);
+
+				// — Then, the deadline/top‐level info (no thread)
+				const infoMsg = finisher
+					.startMessage()
+					.setSender(this.app.botUser)
+					.setRoom(room)
+					.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
+					.setThreadId(msgId);
+
+				await finisher.finish(infoMsg);
 			}
-		} catch (error) {
-			this.app.getLogger().error(`Error in ask question run method: ${error.message}`);
+
+			// 4) Persist the sent message IDs and mark “sent”
+			saved.msgIds = messageIds;
+			saved.state = 'sent';
+			await persistence.updateByAssociation(assoc, saved, true);
+		} catch (err) {
+			this.app.getLogger().error(`Error in ask-question processor: ${err.message}`);
 		}
 	}
 

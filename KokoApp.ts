@@ -13,7 +13,7 @@ import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IAppInfo } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
-import { StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
+import { IJobContext, StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
 import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
 import {
 	IUIKitInteractionHandler,
@@ -410,6 +410,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 					await this.kokoValues.run(read, modify, persistence);
 				},
 			},
+			{
+				id: 'ask-question',
+				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
+					const questionAssocId = jobContext.questionAssocId as string;
+					const handler = new KokoAskQuestion(this);
+					await handler.run(read, modify, persistence, questionAssocId);
+				},
+			},
 		]);
 	}
 
@@ -450,6 +458,22 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				`response_${parentMessage.id}`,
 			);
 
+			if (associations.length === 0) {
+				this.getLogger().info(
+					'No question found for the response',
+					JSON.stringify({ associations: associations, questionId, parsedText, text: parentMessage.text }),
+				);
+				read.getNotifier().notifyUser(message.sender, {
+					text: "This question doesn't exist anymore",
+					room: message.room,
+					sender: this.botUser,
+					alias: this.kokoName,
+					emoji: this.kokoEmojiAvatar,
+					threadId: message.threadId,
+				});
+				return;
+			}
+
 			const questionDate = new Date(associations[0]?.collectionDate);
 			if (!questionDate) {
 				this.getLogger().info('No question date found');
@@ -458,6 +482,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 
 			if (AskQuestionHelper.isQuestionExpired(questionDate)) {
 				this.getLogger().info('Question date has passed');
+				read.getNotifier().notifyUser(message.sender, {
+					text: 'You can no longer respond to this question.',
+					room: message.room,
+					sender: this.botUser,
+					alias: this.kokoName,
+					emoji: this.kokoEmojiAvatar,
+					threadId: message.threadId,
+				});
 				return;
 			}
 

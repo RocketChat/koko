@@ -4,4 +4,5 @@ export type QuestionPayload = {
 	askedBy: string;
 	timestamp: string;
 	msgIds: string[];
+	state: 'pending' | 'sent' | 'closed';
 };
