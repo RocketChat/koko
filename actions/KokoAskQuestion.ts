@@ -45,7 +45,19 @@ export class KokoAskQuestion {
 			return context.getInteractionResponder().viewErrorResponse({
 				viewId: data.view.id,
 				errors: {
-					'question-input-block': 'Please enter a question to ask',
+					'question-input-action': 'Please enter a question to ask',
+				},
+			});
+		}
+
+		// Check if the date is valid and in the future
+		const today = new Date();
+
+		if (!collectionDate || new Date(collectionDate) < today) {
+			return context.getInteractionResponder().viewErrorResponse({
+				viewId: data.view.id,
+				errors: {
+					'question-input-action': 'Please select a valid date in the future',
 				},
 			});
 		}
