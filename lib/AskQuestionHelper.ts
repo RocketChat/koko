@@ -15,7 +15,6 @@ export class AskQuestionHelper {
 	public static isMessageIntendedForBot(message: IMessage, appUser: IUser | undefined): boolean {
 		return !!(
 			message.threadId && // Ensure the message is part of a thread
-			message.text && // Ensure the message has text
 			appUser && // Ensure the app user is defined
 			message.sender.id !== appUser.id && // Exclude messages sent by the bot itself
 			message.room.userIds?.includes(appUser.id) && // Ensure the bot is part of the room

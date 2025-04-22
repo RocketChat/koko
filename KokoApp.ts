@@ -500,12 +500,13 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 			}
 
 			const responsePayload: ResponsePayload = {
-				response: message.text as string,
+				response: message.text,
 				questionId,
 				questionText: parsedText,
 				userId: message.sender.id,
 				roomId: message.room.id,
 				msgId: message.id as string,
+				attachments: message.attachments,
 			};
 
 			// Save the response

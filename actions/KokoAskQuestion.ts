@@ -1,7 +1,5 @@
 import { IHttp, IModify, IPersistence, IRead } from '@rocket.chat/apps-engine/definition/accessors';
-import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
 import { UIKitViewSubmitInteractionContext } from '@rocket.chat/apps-engine/definition/uikit';
-import { IUser } from '@rocket.chat/apps-engine/definition/users';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
 
 import { KokoApp } from '../KokoApp';
@@ -192,24 +190,6 @@ export class KokoAskQuestion {
 	}
 
 	/**
-	 * Collects and processes responses for a question
-	 */
-	public async collectResponses(read: IRead, persistence: IPersistence, questionId: string) {
-		try {
-			const assocQuestion = new RocketChatAssociationRecord(
-				RocketChatAssociationModel.MISC,
-				`asked_question_${questionId}`,
-			);
-
-			const responses = await read.getPersistenceReader().readByAssociation(assocQuestion);
-			return responses;
-		} catch (error) {
-			this.app.getLogger().error(`Error collecting responses: ${error.message}`);
-			return null;
-		}
-	}
-
-	/**
 	 * Scheduler processor for "post-answers":
 	 *  1) Load the QuestionPayload, including saved.msgIds[]
 	 *  2) For each thread (msgId) fetch all replies
@@ -240,6 +220,9 @@ export class KokoAskQuestion {
 				.getSettings()
 				.getValueById('Post_Answers_Room_Name')) as string;
 
+			// remove trailing slash
+			const trimmedServerUrl = serverUrl.replace(/\/$/, '');
+
 			const answerRoom = await read.getRoomReader().getByName(answerRoomName);
 			if (!answerRoom) {
 				throw new Error(`postAnswers: could not find room "${answerRoomName}"`);
@@ -248,7 +231,12 @@ export class KokoAskQuestion {
 			const finisher = modify.getCreator();
 
 			// Post the question as a new message in the answers room
-			const first = finisher.startMessage().setRoom(answerRoom).setText(`*Question:* ${questionText}`);
+			const first = finisher
+				.startMessage()
+				.setRoom(answerRoom)
+				.setText(`*Question:* ${questionText}`)
+				.setUsernameAlias(this.app.kokoName)
+				.setEmojiAvatar(this.app.kokoEmojiAvatar);
 			const firstId = await finisher.finish(first);
 
 			// For each original question‐msgId, fetch its recorded replies
@@ -256,7 +244,6 @@ export class KokoAskQuestion {
 			for (const threadId of msgIds) {
 				// read from the persistence
 				const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `response_${threadId}`);
-				console.log('assoc', assoc);
 				const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as ResponsePayload[];
 				if (!saved) {
 					this.app.getLogger().error(`postAnswers: no response for ${threadId}`);
@@ -268,8 +255,9 @@ export class KokoAskQuestion {
 					this.app.getLogger().error(`postAnswers: no user for ${userId}`);
 					continue;
 				}
+
 				// Build the link to the reply
-				linkLines.push(`• [${reply.username || 'user'}](${serverUrl}/direct/${rid}?msg=${mid})`);
+				linkLines.push(`• [${reply.username || 'user'}](${trimmedServerUrl}/direct/${rid}?msg=${mid})`);
 			}
 
 			if (linkLines.length === 0) {
