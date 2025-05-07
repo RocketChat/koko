@@ -13,7 +13,7 @@ import { ApiSecurity, ApiVisibility } from '@rocket.chat/apps-engine/definition/
 import { App } from '@rocket.chat/apps-engine/definition/App';
 import { IAppInfo } from '@rocket.chat/apps-engine/definition/metadata';
 import { IRoom } from '@rocket.chat/apps-engine/definition/rooms';
-import { StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
+import { IJobContext, StartupType } from '@rocket.chat/apps-engine/definition/scheduler';
 import { ISetting } from '@rocket.chat/apps-engine/definition/settings';
 import {
 	IUIKitInteractionHandler,
@@ -40,8 +40,13 @@ import { questionModal } from './modals/QuestionModal';
 import { valuesModal } from './modals/ValuesModal';
 import { settings } from './settings';
 import { KokoSend } from './actions/KokoSend';
+import { KokoAskQuestion } from './actions/KokoAskQuestion';
+import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
+import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
+import { ResponsePayload } from './types/AskQuestion';
+import { AskQuestionHelper } from './lib/AskQuestionHelper';
 
-export class KokoApp extends App implements IUIKitInteractionHandler {
+export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
 	/**
 	 * The bot username alias
 	 */
@@ -103,6 +108,11 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 	public kokoQuestion: KokoQuestion;
 
 	/**
+	 * The question ask mechanism
+	 */
+	public kokoQuestionAsk: KokoAskQuestion;
+
+	/**
 	 * The values mechanism
 	 */
 	public kokoValues: KokoValues;
@@ -154,6 +164,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 				return this.kokoValues.submit({ context, modify, read, persistence, http });
 			case 'send':
 				return this.kokoSend.submit({ context, modify, read, persistence, http });
+			case 'question-ask-modal':
+				return this.kokoQuestionAsk.submit({
+					context,
+					modify,
+					read,
+					persistence,
+					http,
+				});
 		}
 		return {
 			success: true,
@@ -204,6 +222,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 		this.kokoWellness = new KokoWellness(this);
 		this.kokoValues = new KokoValues(this);
 		this.kokoSend = new KokoSend(this);
+		this.kokoQuestionAsk = new KokoAskQuestion(this);
 
 		await this.extendConfiguration(configurationExtend);
 	}
@@ -390,7 +409,125 @@ export class KokoApp extends App implements IUIKitInteractionHandler {
 					await this.kokoValues.run(read, modify, persistence);
 				},
 			},
+			{
+				id: 'ask-question',
+				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
+					const questionAssocId = jobContext.questionAssocId as string;
+					const handler = new KokoAskQuestion(this);
+					await handler.run(read, modify, persistence, questionAssocId);
+				},
+			},
+			{
+				id: 'post-answers',
+				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
+					const { questionAssocId } = jobContext as { questionAssocId: string };
+					await this.kokoQuestionAsk.postAnswers(read, modify, persistence, questionAssocId);
+				},
+			},
 		]);
+	}
+
+	async executePostMessageSent(
+		message: IMessage,
+		read: IRead,
+		http: IHttp,
+		persistence: IPersistence,
+		modify: IModify,
+	): Promise<void> {
+		const appUser = await read.getUserReader().getAppUser(this.getID());
+
+		if (!AskQuestionHelper.isMessageIntendedForBot(message, appUser)) {
+			return;
+		}
+
+		try {
+			const parentMessage = await read.getMessageReader().getById(message.threadId as string);
+
+			if (!parentMessage) {
+				this.getLogger().debug('Parent message not found');
+				return;
+			}
+
+			if (!AskQuestionHelper.isParentMessageValid(parentMessage, this.botUser.id)) {
+				this.getLogger().info('Invalid parent message', { parentMessage });
+				return;
+			}
+
+			const parsedText = AskQuestionHelper.parseMessageText(parentMessage.text!);
+
+			const questionId = AskQuestionHelper.generateQuestionId(parsedText);
+
+			const associations = await AskQuestionHelper.getQuestionAssociations(read, questionId);
+
+			const responseAssociation = new RocketChatAssociationRecord(
+				RocketChatAssociationModel.MISC,
+				`response_${parentMessage.id}`,
+			);
+
+			if (associations.length === 0) {
+				this.getLogger().info(
+					'No question found for the response',
+					JSON.stringify({ associations: associations, questionId, parsedText, text: parentMessage.text }),
+				);
+				read.getNotifier().notifyUser(message.sender, {
+					text: "This question doesn't exist anymore",
+					room: message.room,
+					sender: this.botUser,
+					alias: this.kokoName,
+					emoji: this.kokoEmojiAvatar,
+					threadId: message.threadId,
+				});
+				return;
+			}
+
+			const questionDate = new Date(associations[0]?.collectionDate);
+			if (!questionDate) {
+				this.getLogger().info('No question date found');
+				return;
+			}
+
+			if (AskQuestionHelper.isQuestionExpired(questionDate)) {
+				this.getLogger().info('Question date has passed');
+				read.getNotifier().notifyUser(message.sender, {
+					text: 'You can no longer respond to this question.',
+					room: message.room,
+					sender: this.botUser,
+					alias: this.kokoName,
+					emoji: this.kokoEmojiAvatar,
+					threadId: message.threadId,
+				});
+				return;
+			}
+
+			const responsePayload: ResponsePayload = {
+				response: message.text,
+				questionId,
+				questionText: parsedText,
+				userId: message.sender.id,
+				roomId: message.room.id,
+				msgId: message.id as string,
+				attachments: message.attachments,
+			};
+
+			// Save the response
+			await persistence.updateByAssociation(responseAssociation, responsePayload, true);
+
+			await read.getNotifier().notifyUser(message.sender, {
+				text: `Your response to the question "${parsedText}" has been saved successfully!`,
+				room: message.room,
+				sender: this.botUser,
+				alias: this.kokoName,
+				emoji: this.kokoEmojiAvatar,
+				threadId: message.threadId,
+			});
+
+			this.getLogger().debug('Response saved successfully', {
+				questionId,
+				messageId: message.id,
+			});
+		} catch (error) {
+			this.getLogger().error('Error processing message response:', error);
+		}
 	}
 
 	get membersCache(): MembersCache {

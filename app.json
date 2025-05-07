@@ -13,7 +13,8 @@
     "classFile": "KokoApp.ts",
     "description": "Rocket.Chat Koko Bot",
     "implements": [
-        "IUIKitInteractionHandler"
+        "IUIKitInteractionHandler",
+        "IPostMessageSent"
     ],
     "permissions": [
         {
@@ -51,6 +52,9 @@
         },
         {
             "name": "persistence"
+        },
+        {
+            "name": "server-setting.read"
         }
     ]
 }
