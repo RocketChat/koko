@@ -72,7 +72,11 @@ export class KokoAskQuestion {
 			};
 
 			// send after a minute
-			const sendTime = new Date().setSeconds(new Date().getSeconds() + 10);
+			const sendTime = new Date().setSeconds(new Date().getSeconds() + 60);
+
+			this.app
+				.getLogger()
+				.info(`Scheduling question "${questionText}" for ${sendTime}; current time is ${new Date()}`);
 
 			// Encode the question text to create a unique ID
 			const questionId = Buffer.from(questionText?.trim(), 'utf-8').toString('base64');
@@ -108,6 +112,7 @@ export class KokoAskQuestion {
 		}
 
 		try {
+			this.app.getLogger().debug(`ask-question processor: ${questionAssocId}`);
 			// Load the saved question
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
@@ -136,6 +141,8 @@ export class KokoAskQuestion {
 
 			// Fetch members and send
 			const members = await getMembers(this.app, read);
+
+			this.app.getLogger().debug(`ask-question processor: members ${members.length}`);
 			const messageIds: string[] = [];
 			const finisher = modify.getCreator();
 
@@ -145,6 +152,7 @@ export class KokoAskQuestion {
 				}
 				const room = await getDirect(this.app, read, modify, member.username);
 				if (!room) {
+					this.app.getLogger().error(`ask-question processor: no room for ${member.username}`);
 					continue;
 				}
 
@@ -158,18 +166,28 @@ export class KokoAskQuestion {
 					.setRoom(room)
 					.setText(highlightedText);
 
-				const msgId = await finisher.finish(firstMsg);
-				messageIds.push(msgId);
+				try {
+					const msgId = await finisher.finish(firstMsg);
+					messageIds.push(msgId);
 
-				// Then, the deadline/top‐level info (in thread)
-				const infoMsg = finisher
-					.startMessage()
-					.setSender(this.app.botUser)
-					.setRoom(room)
-					.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
-					.setThreadId(msgId);
+					this.app
+						.getLogger()
+						.debug(`ask-question processor: sent question to ${member.username} (${msgId})`);
+					// Then, the deadline/top‐level info (in thread)
+					const infoMsg = finisher
+						.startMessage()
+						.setSender(this.app.botUser)
+						.setRoom(room)
+						.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
+						.setThreadId(msgId);
 
-				await finisher.finish(infoMsg);
+					await finisher.finish(infoMsg);
+				} catch (error) {
+					this.app
+						.getLogger()
+						.error(`ask-question processor: error sending message to ${member.username}`, error);
+					continue;
+				}
 			}
 
 			// Persist the sent message IDs and mark “sent”
@@ -185,7 +203,7 @@ export class KokoAskQuestion {
 				data: { questionAssocId },
 			});
 		} catch (err) {
-			this.app.getLogger().error(`Error in ask-question processor: ${err.message}`);
+			this.app.getLogger().error(`Error in ask-question processor`, err);
 		}
 	}
 
