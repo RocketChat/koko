@@ -72,7 +72,11 @@ export class KokoAskQuestion {
 			};
 
 			// send after a minute
-			const sendTime = new Date().setSeconds(new Date().getSeconds() + 10);
+			const sendTime = new Date().setSeconds(new Date().getSeconds() + 60);
+
+			this.app
+				.getLogger()
+				.info(`Scheduling question "${questionText}" for ${sendTime}; current time is ${new Date()}`);
 
 			// Encode the question text to create a unique ID
 			const questionId = Buffer.from(questionText?.trim(), 'utf-8').toString('base64');
@@ -108,6 +112,7 @@ export class KokoAskQuestion {
 		}
 
 		try {
+			this.app.getLogger().debug(`ask-question processor: ${questionAssocId}`);
 			// Load the saved question
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
@@ -136,6 +141,8 @@ export class KokoAskQuestion {
 
 			// Fetch members and send
 			const members = await getMembers(this.app, read);
+
+			this.app.getLogger().debug(`ask-question processor: members ${members.length}`);
 			const messageIds: string[] = [];
 			const finisher = modify.getCreator();
 
@@ -145,6 +152,7 @@ export class KokoAskQuestion {
 				}
 				const room = await getDirect(this.app, read, modify, member.username);
 				if (!room) {
+					this.app.getLogger().error(`ask-question processor: no room for ${member.username}`);
 					continue;
 				}
 
@@ -158,18 +166,30 @@ export class KokoAskQuestion {
 					.setRoom(room)
 					.setText(highlightedText);
 
-				const msgId = await finisher.finish(firstMsg);
-				messageIds.push(msgId);
+				try {
+					const msgId = await finisher.finish(firstMsg);
+					messageIds.push(msgId);
 
-				// Then, the deadline/top‐level info (in thread)
-				const infoMsg = finisher
-					.startMessage()
-					.setSender(this.app.botUser)
-					.setRoom(room)
-					.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
-					.setThreadId(msgId);
+					this.app
+						.getLogger()
+						.debug(`ask-question processor: sent question to ${member.username} (${msgId})`);
+					// Then, the deadline/top‐level info (in thread)
+					const infoMsg = finisher
+						.startMessage()
+						.setSender(this.app.botUser)
+						.setRoom(room)
+						.setUsernameAlias(this.app.kokoName)
+						.setEmojiAvatar(this.app.kokoEmojiAvatar)
+						.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
+						.setThreadId(msgId);
 
-				await finisher.finish(infoMsg);
+					await finisher.finish(infoMsg);
+				} catch (error) {
+					this.app
+						.getLogger()
+						.error(`ask-question processor: error sending message to ${member.username}`, error);
+					continue;
+				}
 			}
 
 			// Persist the sent message IDs and mark “sent”
@@ -185,7 +205,7 @@ export class KokoAskQuestion {
 				data: { questionAssocId },
 			});
 		} catch (err) {
-			this.app.getLogger().error(`Error in ask-question processor: ${err.message}`);
+			this.app.getLogger().error(`Error in ask-question processor`, err);
 		}
 	}
 
@@ -196,7 +216,13 @@ export class KokoAskQuestion {
 	 *  3) Build a per‑reply link: https://<server>/direct/<roomId>?msg=<msgId>
 	 *  4) Post into your configured answers room: first the question, then all links in a thread
 	 */
-	public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence, questionAssocId: string) {
+	public async postAnswers(
+		read: IRead,
+		modify: IModify,
+		persistence: IPersistence,
+		questionAssocId: string,
+		roomName?: string,
+	) {
 		try {
 			// Load question record
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
@@ -215,10 +241,9 @@ export class KokoAskQuestion {
 				.getEnvironmentReader()
 				.getServerSettings()
 				.getValueById('Site_Url')) as string;
-			const answerRoomName = (await read
-				.getEnvironmentReader()
-				.getSettings()
-				.getValueById('Post_Answers_Room_Name')) as string;
+			const answerRoomName =
+				roomName ||
+				((await read.getEnvironmentReader().getSettings().getValueById('Post_Answers_Room_Name')) as string);
 
 			// remove trailing slash
 			const trimmedServerUrl = serverUrl.replace(/\/$/, '');
@@ -227,6 +252,7 @@ export class KokoAskQuestion {
 			if (!answerRoom) {
 				throw new Error(`postAnswers: could not find room "${answerRoomName}"`);
 			}
+			this.app.getLogger().debug(`postAnswers: posting to ${answerRoomName} (${answerRoom.id})`);
 
 			const finisher = modify.getCreator();
 
@@ -236,6 +262,7 @@ export class KokoAskQuestion {
 				.setRoom(answerRoom)
 				.setText(`*Question:* ${questionText}`)
 				.setUsernameAlias(this.app.kokoName)
+				.setSender(this.app.botUser)
 				.setEmojiAvatar(this.app.kokoEmojiAvatar);
 			const firstId = await finisher.finish(first);
 
@@ -269,6 +296,9 @@ export class KokoAskQuestion {
 				.startMessage()
 				.setRoom(answerRoom)
 				.setThreadId(firstId)
+				.setSender(this.app.botUser)
+				.setUsernameAlias(this.app.kokoName)
+				.setEmojiAvatar(this.app.kokoEmojiAvatar)
 				.setText(linkLines.join('\n'));
 			await finisher.finish(threadMsg);
 
@@ -278,5 +308,41 @@ export class KokoAskQuestion {
 		} catch (err) {
 			this.app.getLogger().error(`postAnswers error: ${err.message}`);
 		}
+	}
+
+	public async showQuestionInfoByText(
+		read: IRead,
+		modify: IModify,
+		persistence: IPersistence,
+		text: string,
+		roomId: string,
+	): Promise<void> {
+		const questionId = Buffer.from(text, 'utf-8').toString('base64');
+		const questionAssocId = `question_${questionId}`;
+		const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
+		const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
+
+		if (!saved) {
+			throw new Error(`No question found for ${text}`);
+		}
+
+		const roomInfo = await read.getRoomReader().getById(roomId);
+		if (!roomInfo) {
+			this.app.getLogger().error(`No room found for ${roomId}`);
+			return;
+		}
+
+		const finisher = modify.getCreator();
+		const formattedData = JSON.stringify(saved, null, 2);
+
+		const message = finisher
+			.startMessage()
+			.setSender(this.app.botUser)
+			.setUsernameAlias(this.app.kokoName)
+			.setEmojiAvatar(this.app.kokoEmojiAvatar)
+			.setRoom(roomInfo)
+			.setText(`*Question Data (\`${questionAssocId}\`):*\n\`\`\`\n${formattedData}\n\`\`\``);
+
+		await finisher.finish(message);
 	}
 }
