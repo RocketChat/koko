@@ -178,6 +178,8 @@ export class KokoAskQuestion {
 						.startMessage()
 						.setSender(this.app.botUser)
 						.setRoom(room)
+						.setUsernameAlias(this.app.kokoName)
+						.setEmojiAvatar(this.app.kokoEmojiAvatar)
 						.setText(`*Deadline:* ${formattedDate}\nReply below in the thread to submit your answer`)
 						.setThreadId(msgId);
 
@@ -214,7 +216,13 @@ export class KokoAskQuestion {
 	 *  3) Build a per‑reply link: https://<server>/direct/<roomId>?msg=<msgId>
 	 *  4) Post into your configured answers room: first the question, then all links in a thread
 	 */
-	public async postAnswers(read: IRead, modify: IModify, persistence: IPersistence, questionAssocId: string) {
+	public async postAnswers(
+		read: IRead,
+		modify: IModify,
+		persistence: IPersistence,
+		questionAssocId: string,
+		roomName?: string,
+	) {
 		try {
 			// Load question record
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
@@ -233,10 +241,9 @@ export class KokoAskQuestion {
 				.getEnvironmentReader()
 				.getServerSettings()
 				.getValueById('Site_Url')) as string;
-			const answerRoomName = (await read
-				.getEnvironmentReader()
-				.getSettings()
-				.getValueById('Post_Answers_Room_Name')) as string;
+			const answerRoomName =
+				roomName ||
+				((await read.getEnvironmentReader().getSettings().getValueById('Post_Answers_Room_Name')) as string);
 
 			// remove trailing slash
 			const trimmedServerUrl = serverUrl.replace(/\/$/, '');
@@ -245,6 +252,7 @@ export class KokoAskQuestion {
 			if (!answerRoom) {
 				throw new Error(`postAnswers: could not find room "${answerRoomName}"`);
 			}
+			this.app.getLogger().debug(`postAnswers: posting to ${answerRoomName} (${answerRoom.id})`);
 
 			const finisher = modify.getCreator();
 
@@ -254,6 +262,7 @@ export class KokoAskQuestion {
 				.setRoom(answerRoom)
 				.setText(`*Question:* ${questionText}`)
 				.setUsernameAlias(this.app.kokoName)
+				.setSender(this.app.botUser)
 				.setEmojiAvatar(this.app.kokoEmojiAvatar);
 			const firstId = await finisher.finish(first);
 
@@ -287,6 +296,9 @@ export class KokoAskQuestion {
 				.startMessage()
 				.setRoom(answerRoom)
 				.setThreadId(firstId)
+				.setSender(this.app.botUser)
+				.setUsernameAlias(this.app.kokoName)
+				.setEmojiAvatar(this.app.kokoEmojiAvatar)
 				.setText(linkLines.join('\n'));
 			await finisher.finish(threadMsg);
 
@@ -296,5 +308,41 @@ export class KokoAskQuestion {
 		} catch (err) {
 			this.app.getLogger().error(`postAnswers error: ${err.message}`);
 		}
+	}
+
+	public async showQuestionInfoByText(
+		read: IRead,
+		modify: IModify,
+		persistence: IPersistence,
+		text: string,
+		roomId: string,
+	): Promise<void> {
+		const questionId = Buffer.from(text, 'utf-8').toString('base64');
+		const questionAssocId = `question_${questionId}`;
+		const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
+		const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
+
+		if (!saved) {
+			throw new Error(`No question found for ${text}`);
+		}
+
+		const roomInfo = await read.getRoomReader().getById(roomId);
+		if (!roomInfo) {
+			this.app.getLogger().error(`No room found for ${roomId}`);
+			return;
+		}
+
+		const finisher = modify.getCreator();
+		const formattedData = JSON.stringify(saved, null, 2);
+
+		const message = finisher
+			.startMessage()
+			.setSender(this.app.botUser)
+			.setUsernameAlias(this.app.kokoName)
+			.setEmojiAvatar(this.app.kokoEmojiAvatar)
+			.setRoom(roomInfo)
+			.setText(`*Question Data (\`${questionAssocId}\`):*\n\`\`\`\n${formattedData}\n\`\`\``);
+
+		await finisher.finish(message);
 	}
 }
