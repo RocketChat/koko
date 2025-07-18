@@ -119,6 +119,7 @@ export async function praiseRegisteredModal({
 				text: 'Dismiss',
 			},
 		}),
+		submit: undefined,
 		blocks: block.getBlocks(),
 	};
 }
