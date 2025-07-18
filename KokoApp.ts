@@ -434,11 +434,17 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 		persistence: IPersistence,
 		modify: IModify,
 	): Promise<void> {
-		const appUser = await read.getUserReader().getAppUser(this.getID());
+		const appUser = this.botUser || (await read.getUserReader().getByUsername(this.botUsername));
 
 		if (!AskQuestionHelper.isMessageIntendedForBot(message, appUser)) {
+			// if message is from the bot user, log and return
+			this.getLogger().debug(
+				`Message ${message?.threadId} is not intended for the bot. Sender: ${message.sender?.username}, ${message.sender?.id}, Room: ${JSON.stringify(message?.room)}, App User: ${JSON.stringify(appUser)}`,
+			);
 			return;
 		}
+
+		this.getLogger().debug('Processing message response');
 
 		try {
 			const parentMessage = await read.getMessageReader().getById(message.threadId as string);
