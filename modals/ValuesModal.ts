@@ -159,6 +159,7 @@ export async function valuesRegisteredModal({
 				text: 'Dismiss',
 			},
 		}),
+		submit: undefined,
 		blocks: block.getBlocks(),
 	};
 }
