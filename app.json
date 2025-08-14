@@ -1,6 +1,6 @@
 {
     "id": "b9970f61-06ac-46e4-ade3-3b0f0c667739",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "requiredApiVersion": "^1.49.0",
     "iconFile": "icon.png",
     "author": {
@@ -55,6 +55,9 @@
         },
         {
             "name": "server-setting.read"
+        },
+        {
+            "name": "networking"
         }
     ]
 }
