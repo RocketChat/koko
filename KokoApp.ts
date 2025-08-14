@@ -377,17 +377,6 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				},
 			},
 			{
-				id: 'one-on-one',
-				startupSetting: {
-					type: StartupType.RECURRING,
-					interval: '0 17 * * 4',
-					data: { appId: this.getID() },
-				},
-				processor: async (jobContext, read, modify, http, persistence) => {
-					await this.kokoOneOnOne.run(read, modify, persistence);
-				},
-			},
-			{
 				id: 'welness',
 				startupSetting: {
 					type: StartupType.RECURRING,
