@@ -256,20 +256,9 @@ export class KokoAskQuestion {
 
 			const finisher = modify.getCreator();
 
-			// Post the question as a new message in the answers room
-			const first = finisher
-				.startMessage()
-				.setRoom(answerRoom)
-				.setText(`*Question:* ${questionText}`)
-				.setUsernameAlias(this.app.kokoName)
-				.setSender(this.app.botUser)
-				.setEmojiAvatar(this.app.kokoEmojiAvatar);
-			const firstId = await finisher.finish(first);
-
-			// For each original question‐msgId, fetch its recorded replies
-			const linkLines: string[] = [];
+			// Collect all responses first to check if we have any
+			const responses: Array<{ username: string; link: string }> = [];
 			for (const threadId of msgIds) {
-				// read from the persistence
 				const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `response_${threadId}`);
 				const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as ResponsePayload[];
 				if (!saved) {
@@ -283,26 +272,64 @@ export class KokoAskQuestion {
 					continue;
 				}
 
-				// Build the link to the reply
-				linkLines.push(`• [${reply.username || 'user'}](${trimmedServerUrl}/direct/${rid}?msg=${mid})`);
+				responses.push({
+					username: reply.username || 'user',
+					link: `${trimmedServerUrl}/direct/${rid}?msg=${mid}`,
+				});
 			}
 
-			if (linkLines.length === 0) {
-				linkLines.push('_No answers submitted._');
+			const responseCount = responses.length;
+
+			// Send question header as standalone message
+			let questionHeader = `** ${questionText} **\n\n`;
+			if (responseCount === 0) {
+				questionHeader += `_No responses received._`;
+			} else {
+				questionHeader += `_${responseCount} response${responseCount === 1 ? '' : 's'} received_`;
+				if (responseCount > 1) {
+					questionHeader += ` _(${responseCount - 1} additional response${responseCount - 1 === 1 ? '' : 's'} in thread)_`;
+				}
 			}
 
-			// Post all of the links as a threaded reply under `firstId`
-			const threadMsg = finisher
+			const questionMsg = finisher
 				.startMessage()
 				.setRoom(answerRoom)
-				.setThreadId(firstId)
-				.setSender(this.app.botUser)
+				.setText(questionHeader)
 				.setUsernameAlias(this.app.kokoName)
-				.setEmojiAvatar(this.app.kokoEmojiAvatar)
-				.setText(linkLines.join('\n'));
-			await finisher.finish(threadMsg);
+				.setSender(this.app.botUser)
+				.setEmojiAvatar(this.app.kokoEmojiAvatar);
+			const questionMsgId = await finisher.finish(questionMsg);
 
-			//  Optionally mark the question "closed" in persistence
+			// Send first response as separate message for clean embedded preview
+			if (responses.length > 0) {
+				const firstResponse = responses[0];
+				const firstResponseMsg = finisher
+					.startMessage()
+					.setRoom(answerRoom)
+					.setText(`[**${firstResponse.username}**](${firstResponse.link})`)
+					.setUsernameAlias(this.app.kokoName)
+					.setSender(this.app.botUser)
+					.setEmojiAvatar(this.app.kokoEmojiAvatar);
+				await finisher.finish(firstResponseMsg);
+
+				// Send additional responses in thread under question
+				if (responses.length > 1) {
+					for (let i = 1; i < responses.length; i++) {
+						const response = responses[i];
+						const responseMsg = finisher
+							.startMessage()
+							.setRoom(answerRoom)
+							.setText(`[**${response.username}**](${response.link})`)
+							.setUsernameAlias(this.app.kokoName)
+							.setSender(this.app.botUser)
+							.setEmojiAvatar(this.app.kokoEmojiAvatar)
+							.setThreadId(questionMsgId);
+						await finisher.finish(responseMsg);
+					}
+				}
+			}
+
+			// Mark the question "closed" in persistence
 			saved.state = 'closed';
 			await persistence.updateByAssociation(assoc, saved, true);
 		} catch (err) {
