@@ -285,10 +285,10 @@ export class KokoAskQuestion {
 			if (responseCount === 0) {
 				questionHeader += `_No responses received._`;
 			} else {
-				questionHeader += `_${responseCount} response${responseCount === 1 ? '' : 's'} received_`;
-				if (responseCount > 1) {
-					questionHeader += ` _(${responseCount - 1} additional response${responseCount - 1 === 1 ? '' : 's'} in thread)_`;
-				}
+				// Engaging teaser that encourages opening the thread, with proper grammar
+				const responseWord = responseCount === 1 ? 'response' : 'responses';
+				const photosPhrase = responseCount === 1 ? 'the photo' : 'all the photos';
+				questionHeader += `_${responseCount} ${responseWord} received… and you won’t believe what’s inside. Open the thread to see ${photosPhrase}! 👀_`;
 			}
 
 			const questionMsg = finisher
@@ -312,20 +312,18 @@ export class KokoAskQuestion {
 					.setEmojiAvatar(this.app.kokoEmojiAvatar);
 				await finisher.finish(firstResponseMsg);
 
-				// Send additional responses in thread under question
-				if (responses.length > 1) {
-					for (let i = 1; i < responses.length; i++) {
-						const response = responses[i];
-						const responseMsg = finisher
-							.startMessage()
-							.setRoom(answerRoom)
-							.setText(`[**${response.username}**](${response.link})`)
-							.setUsernameAlias(this.app.kokoName)
-							.setSender(this.app.botUser)
-							.setEmojiAvatar(this.app.kokoEmojiAvatar)
-							.setThreadId(questionMsgId);
-						await finisher.finish(responseMsg);
-					}
+				// Send ALL responses in thread under the question (including the first one)
+				for (let i = 0; i < responses.length; i++) {
+					const response = responses[i];
+					const responseMsg = finisher
+						.startMessage()
+						.setRoom(answerRoom)
+						.setText(`[**${response.username}**](${response.link})`)
+						.setUsernameAlias(this.app.kokoName)
+						.setSender(this.app.botUser)
+						.setEmojiAvatar(this.app.kokoEmojiAvatar)
+						.setThreadId(questionMsgId);
+					await finisher.finish(responseMsg);
 				}
 			}
 
