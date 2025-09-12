@@ -256,26 +256,56 @@ export class KokoAskQuestion {
 
 			const finisher = modify.getCreator();
 
-			// Collect all responses first to check if we have any
-			const responses: Array<{ username: string; link: string }> = [];
-			for (const threadId of msgIds) {
-				const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, `response_${threadId}`);
-				const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as ResponsePayload[];
-				if (!saved) {
-					this.app.getLogger().error(`postAnswers: no response for ${threadId}`);
-					continue;
-				}
-				const { roomId: rid, msgId: mid, userId } = saved;
-				const reply = await read.getUserReader().getById(userId);
-				if (!reply) {
-					this.app.getLogger().error(`postAnswers: no user for ${userId}`);
-					continue;
-				}
+			// Collect all responses concurrently (compatible with ES2017)
+			const collected = await Promise.all(
+				msgIds.map(async (threadId) => {
+					try {
+						const responseAssoc = new RocketChatAssociationRecord(
+							RocketChatAssociationModel.MISC,
+							`response_${threadId}`,
+						);
+						const [savedResp] = (await read
+							.getPersistenceReader()
+							.readByAssociation(responseAssoc)) as ResponsePayload[];
+						if (!savedResp) {
+							this.app.getLogger().debug(`postAnswers: no saved response for ${threadId}`);
+							return null;
+						}
+						const { roomId: rid, msgId: mid, userId } = savedResp;
+						const [replyUser, replyMsg] = await Promise.all([
+							read.getUserReader().getById(userId),
+							read.getMessageReader().getById(mid),
+						]);
+						if (!replyUser) {
+							this.app.getLogger().debug(`postAnswers: no user for ${userId}`);
+							return null;
+						}
+						const createdAt = replyMsg?.createdAt
+							? new Date(replyMsg.createdAt as Date).getTime()
+							: Number.MAX_SAFE_INTEGER;
+						return {
+							username: replyUser.username || 'user',
+							link: `${trimmedServerUrl}/direct/${rid}?msg=${mid}`,
+							createdAt,
+						};
+					} catch (e) {
+						this.app.getLogger().debug(`postAnswers: error collecting for ${threadId}: ${e.message}`);
+						return null;
+					}
+				}),
+			);
 
-				responses.push({
-					username: reply.username || 'user',
-					link: `${trimmedServerUrl}/direct/${rid}?msg=${mid}`,
-				});
+			// Single pass: build responses and compute earliest
+			const responses: Array<{ username: string; link: string; createdAt: number }> = [];
+			let earliest: { username: string; link: string; createdAt: number } | null = null;
+			for (const entry of collected) {
+				if (!entry) {
+					continue;
+				}
+				responses.push(entry);
+				if (!earliest || entry.createdAt < earliest.createdAt) {
+					earliest = entry;
+				}
 			}
 
 			const responseCount = responses.length;
@@ -300,9 +330,9 @@ export class KokoAskQuestion {
 				.setEmojiAvatar(this.app.kokoEmojiAvatar);
 			const questionMsgId = await finisher.finish(questionMsg);
 
-			// Send first response as separate message for clean embedded preview
-			if (responses.length > 0) {
-				const firstResponse = responses[0];
+			// Send first response in main room: earliest by createdAt
+			if (responses.length > 0 && earliest) {
+				const firstResponse = earliest;
 				const firstResponseMsg = finisher
 					.startMessage()
 					.setRoom(answerRoom)
@@ -313,18 +343,20 @@ export class KokoAskQuestion {
 				await finisher.finish(firstResponseMsg);
 
 				// Send ALL responses in thread under the question (including the first one)
-				for (let i = 0; i < responses.length; i++) {
-					const response = responses[i];
-					const responseMsg = finisher
-						.startMessage()
-						.setRoom(answerRoom)
-						.setText(`[**${response.username}**](${response.link})`)
-						.setUsernameAlias(this.app.kokoName)
-						.setSender(this.app.botUser)
-						.setEmojiAvatar(this.app.kokoEmojiAvatar)
-						.setThreadId(questionMsgId);
-					await finisher.finish(responseMsg);
-				}
+				await Promise.all(
+					responses.map((response) =>
+						finisher.finish(
+							finisher
+								.startMessage()
+								.setRoom(answerRoom)
+								.setText(`[**${response.username}**](${response.link})`)
+								.setUsernameAlias(this.app.kokoName)
+								.setSender(this.app.botUser)
+								.setEmojiAvatar(this.app.kokoEmojiAvatar)
+								.setThreadId(questionMsgId),
+						),
+					),
+				);
 			}
 
 			// Mark the question "closed" in persistence
