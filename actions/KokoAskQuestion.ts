@@ -281,7 +281,7 @@ export class KokoAskQuestion {
 							return null;
 						}
 						const createdAt = replyMsg?.createdAt
-							? new Date(replyMsg.createdAt as Date).getTime()
+							? new Date(replyMsg.createdAt).getTime()
 							: Number.MAX_SAFE_INTEGER;
 						return {
 							username: replyUser.username || 'user',
