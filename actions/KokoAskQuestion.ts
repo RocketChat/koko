@@ -256,7 +256,7 @@ export class KokoAskQuestion {
 
 			const finisher = modify.getCreator();
 
-			// Collect all responses concurrently (compatible with ES2017)
+			// Collect all responses concurrently
 			const collected = await Promise.all(
 				msgIds.map(async (threadId) => {
 					try {
@@ -315,7 +315,6 @@ export class KokoAskQuestion {
 			if (responseCount === 0) {
 				questionHeader += `_No responses received._`;
 			} else {
-				// Engaging teaser that encourages opening the thread, with proper grammar
 				const responseWord = responseCount === 1 ? 'response' : 'responses';
 				const photosPhrase = responseCount === 1 ? 'the photo' : 'all the photos';
 				questionHeader += `_${responseCount} ${responseWord} received… and you won’t believe what’s inside. Open the thread to see ${photosPhrase}! 👀_`;
