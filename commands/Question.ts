@@ -78,12 +78,21 @@ async function handleInfo(
 	sender: IUser,
 	params: string[],
 ): Promise<void> {
-	const questionText = params.join(' ');
-	if (!questionText) {
-		throw new Error('Please provide a question text to show its details');
+	const [flag, value] = params;
+	if (!flag || !value) {
+		throw new Error('Please provide a message ID or link. Example: /koko question info --msg <messageId>');
+	}
+	if (flag !== '--msg' && flag !== '-m') {
+		throw new Error('Invalid flag. Use: /koko question info --msg <messageId>');
 	}
 
-	await app.kokoQuestionAsk.showQuestionInfoByText(read, modify, persistence, questionText, room.id);
+	let messageId = value;
+	const msgParamIndex = value.indexOf('msg=');
+	if (msgParamIndex !== -1) {
+		messageId = value.slice(msgParamIndex + 4).split('&')[0];
+	}
+
+	await app.kokoQuestionAsk.showQuestionInfoByMessageId(read, modify, persistence, messageId, room.id);
 }
 
 async function showHelp(app: KokoApp, modify: IModify, room: any, sender: IUser): Promise<void> {
@@ -94,7 +103,7 @@ async function showHelp(app: KokoApp, modify: IModify, room: any, sender: IUser)
 		sender,
 		'Available subcommands:\n' +
 			'`/koko question` - Create a new question\n' +
-			'`/koko question info <questionText>` - Show question details\n' +
+			'`/koko question info --msg <messageId|messageLink>` - Show question details\n' +
 			'`/koko question repost <questionId> [roomName]` - Repost question answers',
 	);
 }
