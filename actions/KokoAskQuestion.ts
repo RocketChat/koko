@@ -6,7 +6,8 @@ import { KokoApp } from '../KokoApp';
 import { getDirect, getMembers, sendMessage } from '../lib/helpers';
 import { questionSubmittedModal } from '../modals/QuestionAskModal';
 import { createQuestionBlocks } from '../blocks/QuestionBlocks';
-import { QuestionPayload, ResponsePayload } from '../types/AskQuestion';
+import { QuestionMessageLink, QuestionPayload, ResponsePayload } from '../types/AskQuestion';
+import { AskQuestionHelper } from '../lib/AskQuestionHelper';
 
 export class KokoAskQuestion {
 	constructor(private readonly app: KokoApp) {}
@@ -38,8 +39,9 @@ export class KokoAskQuestion {
 
 		const questionText: string = state['question-input-block']?.['question-input-action'];
 		const collectionDate = state['question-date-block']?.['question-date-action'];
+		const trimmedQuestionText = questionText?.trim();
 
-		if (!questionText?.trim()) {
+		if (!trimmedQuestionText) {
 			return context.getInteractionResponder().viewErrorResponse({
 				viewId: data.view.id,
 				errors: {
@@ -50,8 +52,9 @@ export class KokoAskQuestion {
 
 		// Check if the date is valid and in the future
 		const today = new Date();
+		const collectionDateObj = collectionDate ? new Date(collectionDate) : null;
 
-		if (!collectionDate || new Date(collectionDate) < today) {
+		if (!collectionDateObj || collectionDateObj < today) {
 			return context.getInteractionResponder().viewErrorResponse({
 				viewId: data.view.id,
 				errors: {
@@ -61,39 +64,49 @@ export class KokoAskQuestion {
 		}
 
 		try {
+			const questionId = this.buildQuestionId(data.user.id);
+			const questionAssocId = `question_${questionId}`;
+
+			const sendTime = new Date();
+			sendTime.setSeconds(sendTime.getSeconds() + 60);
+
+			if (collectionDateObj <= sendTime) {
+				return context.getInteractionResponder().viewErrorResponse({
+					viewId: data.view.id,
+					errors: {
+						'question-input-action': 'Please select a deadline at least 1 minute from now.',
+					},
+				});
+			}
+
 			// Persist the question
 			const questionData: QuestionPayload = {
-				text: questionText,
+				questionId,
+				text: trimmedQuestionText,
 				collectionDate,
 				askedBy: data.user.id,
 				timestamp: new Date().toISOString(),
+				sendAt: sendTime.toISOString(),
 				msgIds: [],
 				state: 'pending',
 			};
 
-			// send after a minute
-			const sendTime = new Date().setSeconds(new Date().getSeconds() + 60);
-
 			this.app
 				.getLogger()
-				.info(`Scheduling question "${questionText}" for ${sendTime}; current time is ${new Date()}`);
+				.info(`Scheduling question "${trimmedQuestionText}" for ${sendTime}; current time is ${new Date()}`);
 
-			// Encode the question text to create a unique ID
-			const questionId = Buffer.from(questionText?.trim(), 'utf-8').toString('base64');
-
-			const questionAssocId = `question_${questionId}`;
 			const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 			await persistence.updateByAssociation(assoc, questionData, true);
 
 			// Schedule a one‑time job at the given date
 			await modify.getScheduler().scheduleOnce({
 				id: 'ask-question',
-				when: new Date(sendTime),
-				data: { questionAssocId },
+				when: sendTime,
+				data: { questionAssocId, sendAt: sendTime.toISOString() },
 			});
 
 			// 3) Show confirmation
-			const modal = questionSubmittedModal(this.app.getID(), questionText);
+			const modal = questionSubmittedModal(this.app.getID(), trimmedQuestionText);
 			return context.getInteractionResponder().updateModalViewResponse(modal);
 		} catch (err) {
 			this.app.getLogger().error(`Error scheduling question: ${err.message}`);
@@ -122,6 +135,45 @@ export class KokoAskQuestion {
 			}
 
 			const { text: questionText, collectionDate } = saved;
+			const questionId = this.resolveQuestionId(questionAssocId, saved.questionId);
+			if (!saved.questionId) {
+				saved.questionId = questionId;
+			}
+			if (!saved.sendAt) {
+				const sendAt = this.resolveSendAt(saved);
+				if (sendAt) {
+					saved.sendAt = sendAt.toISOString();
+				}
+			}
+
+			if (saved.state !== 'pending') {
+				this.app.getLogger().debug(
+					`ask-question processor: skipping ${questionAssocId} (state=${saved.state})`,
+				);
+				return;
+			}
+
+			const sendAt = this.resolveSendAt(saved);
+			if (sendAt && Date.now() < sendAt.getTime()) {
+				await modify.getScheduler().scheduleOnce({
+					id: 'ask-question',
+					when: sendAt,
+					data: { questionAssocId, sendAt: sendAt.toISOString() },
+				});
+				this.app.getLogger().debug(
+					`ask-question processor: rescheduled ${questionAssocId} for ${sendAt.toISOString()}`,
+				);
+				return;
+			}
+			const collectionDateObj = new Date(collectionDate);
+			if (Number.isNaN(collectionDateObj.getTime()) || collectionDateObj.getTime() <= Date.now()) {
+				saved.state = 'closed';
+				await persistence.updateByAssociation(assoc, saved, true);
+				this.app
+					.getLogger()
+					.error(`ask-question processor: deadline already passed for ${questionAssocId}`);
+				return;
+			}
 
 			// Helper to format the deadline
 			const formatDate = (dateString: string): string => {
@@ -169,6 +221,13 @@ export class KokoAskQuestion {
 				try {
 					const msgId = await finisher.finish(firstMsg);
 					messageIds.push(msgId);
+
+					const questionMsgAssoc = new RocketChatAssociationRecord(
+						RocketChatAssociationModel.MISC,
+						`question_msg_${msgId}`,
+					);
+					const questionMsgLink: QuestionMessageLink = { questionId, questionAssocId };
+					await persistence.updateByAssociation(questionMsgAssoc, questionMsgLink, true);
 
 					this.app
 						.getLogger()
@@ -230,10 +289,31 @@ export class KokoAskQuestion {
 			if (!saved) {
 				throw new Error(`postAnswers: no question for ${questionAssocId}`);
 			}
+			if (saved.state === 'closed') {
+				this.app.getLogger().debug(`postAnswers: already closed for ${questionAssocId}`);
+				return;
+			}
+
+			const postAt = new Date(saved.collectionDate);
+			if (Number.isNaN(postAt.getTime())) {
+				throw new Error(`postAnswers: invalid collectionDate for ${questionAssocId}`);
+			}
+			if (Date.now() < postAt.getTime()) {
+				await modify.getScheduler().scheduleOnce({
+					id: 'post-answers',
+					when: postAt,
+					data: { questionAssocId },
+				});
+				this.app.getLogger().debug(
+					`postAnswers: rescheduled ${questionAssocId} for ${postAt.toISOString()}`,
+				);
+				return;
+			}
 
 			const { text: questionText, msgIds } = saved;
 			if (!msgIds || msgIds.length === 0) {
-				throw new Error(`postAnswers: no msgIds to collect from`);
+				this.app.getLogger().error(`postAnswers: no msgIds to collect from ${questionAssocId}`);
+				return;
 			}
 
 			// Grab server URL and the answer room name from settings
@@ -366,20 +446,67 @@ export class KokoAskQuestion {
 		}
 	}
 
-	public async showQuestionInfoByText(
+	private buildQuestionId(userId: string): string {
+		const now = Date.now().toString(36);
+		const rand = Math.random().toString(36).slice(2, 10);
+		return `${userId}_${now}_${rand}`;
+	}
+
+	private resolveQuestionId(questionAssocId: string, savedQuestionId?: string): string {
+		if (savedQuestionId) {
+			return savedQuestionId;
+		}
+		return questionAssocId.startsWith('question_')
+			? questionAssocId.slice('question_'.length)
+			: questionAssocId;
+	}
+
+	private resolveSendAt(saved: QuestionPayload): Date | null {
+		if (saved.sendAt) {
+			const sendAt = new Date(saved.sendAt);
+			if (!Number.isNaN(sendAt.getTime())) {
+				return sendAt;
+			}
+		}
+		if (saved.timestamp) {
+			const created = new Date(saved.timestamp);
+			if (!Number.isNaN(created.getTime())) {
+				return new Date(created.getTime() + 60 * 1000);
+			}
+		}
+		return null;
+	}
+
+	public async showQuestionInfoByMessageId(
 		read: IRead,
 		modify: IModify,
 		persistence: IPersistence,
-		text: string,
+		messageId: string,
 		roomId: string,
 	): Promise<void> {
-		const questionId = Buffer.from(text, 'utf-8').toString('base64');
-		const questionAssocId = `question_${questionId}`;
+		const questionMsgAssoc = new RocketChatAssociationRecord(
+			RocketChatAssociationModel.MISC,
+			`question_msg_${messageId}`,
+		);
+		const [link] = (await read
+			.getPersistenceReader()
+			.readByAssociation(questionMsgAssoc)) as QuestionMessageLink[];
+		let questionAssocId = link?.questionAssocId;
+		if (!questionAssocId) {
+			const message = await read.getMessageReader().getById(messageId);
+			if (message?.text) {
+				const parsedText = AskQuestionHelper.parseMessageText(message.text);
+				questionAssocId = AskQuestionHelper.generateQuestionId(parsedText);
+			}
+		}
+		if (!questionAssocId) {
+			throw new Error(`No question found for message ID ${messageId}`);
+		}
 		const assoc = new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId);
 		const [saved] = (await read.getPersistenceReader().readByAssociation(assoc)) as QuestionPayload[];
 
 		if (!saved) {
-			throw new Error(`No question found for ${text}`);
+			throw new Error(`No question found for message ID ${messageId}`);
 		}
 
 		const roomInfo = await read.getRoomReader().getById(roomId);

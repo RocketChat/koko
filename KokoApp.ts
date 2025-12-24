@@ -43,7 +43,7 @@ import { KokoSend } from './actions/KokoSend';
 import { KokoAskQuestion } from './actions/KokoAskQuestion';
 import { IMessage, IPostMessageSent } from '@rocket.chat/apps-engine/definition/messages';
 import { RocketChatAssociationModel, RocketChatAssociationRecord } from '@rocket.chat/apps-engine/definition/metadata';
-import { ResponsePayload } from './types/AskQuestion';
+import { QuestionMessageLink, QuestionPayload, ResponsePayload } from './types/AskQuestion';
 import { AskQuestionHelper } from './lib/AskQuestionHelper';
 
 export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessageSent {
@@ -402,6 +402,10 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				id: 'ask-question',
 				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
 					const questionAssocId = jobContext.questionAssocId as string;
+					if (!questionAssocId) {
+						this.getLogger().error('ask-question processor: missing questionAssocId');
+						return;
+					}
 					const handler = new KokoAskQuestion(this);
 					await handler.run(read, modify, persistence, questionAssocId);
 				},
@@ -410,6 +414,10 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				id: 'post-answers',
 				processor: async (jobContext: IJobContext, read, modify, http, persistence) => {
 					const { questionAssocId } = jobContext as { questionAssocId: string };
+					if (!questionAssocId) {
+						this.getLogger().error('post-answers processor: missing questionAssocId');
+						return;
+					}
 					await this.kokoQuestionAsk.postAnswers(read, modify, persistence, questionAssocId);
 				},
 			},
@@ -448,21 +456,41 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				return;
 			}
 
-			const parsedText = AskQuestionHelper.parseMessageText(parentMessage.text!);
+			const questionMsgAssoc = new RocketChatAssociationRecord(
+				RocketChatAssociationModel.MISC,
+				`question_msg_${message.threadId}`,
+			);
+			const [questionMsgLink] = (await read
+				.getPersistenceReader()
+				.readByAssociation(questionMsgAssoc)) as QuestionMessageLink[];
 
-			const questionId = AskQuestionHelper.generateQuestionId(parsedText);
+			let questionAssocId = questionMsgLink?.questionAssocId;
+			let parsedText: string | undefined;
+			if (!questionAssocId) {
+				parsedText = AskQuestionHelper.parseMessageText(parentMessage.text!);
+				questionAssocId = AskQuestionHelper.generateQuestionId(parsedText);
+			}
 
-			const associations = await AskQuestionHelper.getQuestionAssociations(read, questionId);
+			const associations = (await AskQuestionHelper.getQuestionAssociations(
+				read,
+				questionAssocId,
+			)) as QuestionPayload[];
 
 			const responseAssociation = new RocketChatAssociationRecord(
 				RocketChatAssociationModel.MISC,
 				`response_${parentMessage.id}`,
 			);
 
-			if (associations.length === 0) {
+			const [savedQuestion] = associations;
+			if (!savedQuestion) {
 				this.getLogger().info(
 					'No question found for the response',
-					JSON.stringify({ associations: associations, questionId, parsedText, text: parentMessage.text }),
+					JSON.stringify({
+						associations: associations,
+						questionAssocId,
+						parsedText,
+						text: parentMessage.text,
+					}),
 				);
 				read.getNotifier().notifyUser(message.sender, {
 					text: "This question doesn't exist anymore",
@@ -475,7 +503,18 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				return;
 			}
 
-			const questionDate = new Date(associations[0]?.collectionDate);
+			if (!questionMsgLink) {
+				const fallbackQuestionId = questionAssocId.startsWith('question_')
+					? questionAssocId.slice('question_'.length)
+					: questionAssocId;
+				const backfillLink: QuestionMessageLink = {
+					questionId: savedQuestion.questionId || fallbackQuestionId,
+					questionAssocId,
+				};
+				await persistence.updateByAssociation(questionMsgAssoc, backfillLink, true);
+			}
+
+			const questionDate = new Date(savedQuestion.collectionDate);
 			if (!questionDate) {
 				this.getLogger().info('No question date found');
 				return;
@@ -494,10 +533,14 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 				return;
 			}
 
+			const resolvedQuestionId =
+				savedQuestion.questionId ||
+				(questionAssocId.startsWith('question_') ? questionAssocId.slice('question_'.length) : questionAssocId);
+			const resolvedQuestionText = savedQuestion.text || parsedText || '';
 			const responsePayload: ResponsePayload = {
 				response: message.text,
-				questionId,
-				questionText: parsedText,
+				questionId: resolvedQuestionId,
+				questionText: resolvedQuestionText,
 				userId: message.sender.id,
 				roomId: message.room.id,
 				msgId: message.id as string,
@@ -508,7 +551,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 			await persistence.updateByAssociation(responseAssociation, responsePayload, true);
 
 			await read.getNotifier().notifyUser(message.sender, {
-				text: `Your response to the question "${parsedText}" has been saved successfully!`,
+				text: `Your response to the question "${resolvedQuestionText}" has been saved successfully!`,
 				room: message.room,
 				sender: this.botUser,
 				alias: this.kokoName,
@@ -517,7 +560,7 @@ export class KokoApp extends App implements IUIKitInteractionHandler, IPostMessa
 			});
 
 			this.getLogger().debug('Response saved successfully', {
-				questionId,
+				questionId: resolvedQuestionId,
 				messageId: message.id,
 			});
 		} catch (error) {

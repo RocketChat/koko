@@ -41,7 +41,11 @@ export class AskQuestionHelper {
 	 * @returns The parsed text.
 	 */
 	public static parseMessageText(text: string): string {
-		return text.replace(/^\*+|\*+$/g, '').trim();
+		let parsed = text;
+		if (parsed.startsWith('*') && parsed.endsWith('*') && parsed.length >= 2) {
+			parsed = parsed.slice(1, -1);
+		}
+		return parsed.trim();
 	}
 
 	/**
@@ -59,14 +63,14 @@ export class AskQuestionHelper {
 	 * Fetches question associations from persistence.
 	 *
 	 * @param read - The IRead accessor.
-	 * @param questionId - The question ID to fetch associations for.
+	 * @param questionAssocId - The question association ID to fetch for.
 	 * @returns A promise resolving to an array of QuestionPayload.
 	 */
-	public static async getQuestionAssociations(read: IRead, questionId: string): Promise<QuestionPayload[]> {
+	public static async getQuestionAssociations(read: IRead, questionAssocId: string): Promise<QuestionPayload[]> {
 		return (await read
 			.getPersistenceReader()
 			.readByAssociation(
-				new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionId),
+				new RocketChatAssociationRecord(RocketChatAssociationModel.MISC, questionAssocId),
 			)) as QuestionPayload[];
 	}
 
